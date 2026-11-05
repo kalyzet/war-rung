@@ -1,0 +1,245 @@
+# tampilan/laporan.idk — Layar modul Laporan Penjualan (PRD §3.6, DESIGN §5.2).
+# Layout teks-polos dulu, warna dibungkus sesudahnya (DESIGN §7.3).
+
+impor tampilan.dasar
+impor layanan.laporan
+dari inti.galat impor GalatValidasi
+dari inti.format impor rupiah
+dari teks impor teks_ulang
+
+fungsi sel_kiri(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kiri(t, lebar), warna_kode)
+}
+
+fungsi sel_kanan(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kanan(t, lebar), warna_kode)
+}
+
+fungsi rangkai_menu(pesan) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna(dasar.kolom_kiri("LAPORAN PENJUALAN", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n\n"
+    variabel pilihan = [["1", "Laporan harian (hari ini)"], ["2", "Laporan mingguan (Senin-Minggu)"], ["3", "Laporan bulanan"], ["4", "Barang terlaris"], ["5", "Ringkasan piutang"], ["6", "Ekspor CSV"]]
+    untuk i dalam rentang(panjang(pilihan)) {
+        b = b + "  " + dasar.warna("[" + pilihan[i][0] + "]", dasar.NYALA) + " " + dasar.TEKS + pilihan[i][1] + dasar.RESET + "\n"
+    }
+    jika panjang(pesan) > 0 {
+        b = b + "\n  " + dasar.warna("! " + pesan, dasar.MERAH) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[0-6] Pilih | [Enter] Konfirmasi | [0] Kembali" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi judul_laporan(jenis) {
+    jika jenis == "harian" {
+        kembalikan "LAPORAN HARIAN"
+    }
+    jika jenis == "mingguan" {
+        kembalikan "LAPORAN MINGGUAN"
+    }
+    kembalikan "LAPORAN BULANAN"
+}
+
+fungsi rangkai_ringkasan(r) {
+    variabel h = "\n  " + dasar.warna(dasar.kolom_kiri(r["judul"], 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    h = h + "  " + dasar.divider(42) + "\n"
+    variabel label = dasar.REDUP
+    h = h + "  " + label + dasar.kolom_kiri("Periode", 19) + dasar.RESET + ": " + r["periode"] + "\n"
+    h = h + "  " + label + dasar.kolom_kiri("Total transaksi", 19) + dasar.RESET + ": " + ke_teks(r["jumlah"]) + "\n"
+    h = h + "  " + label + dasar.kolom_kiri("Total omzet", 19) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(r["omzet"]), dasar.HIJAU + dasar.TEBAL) + "\n"
+    h = h + "  " + label + dasar.kolom_kiri("Estimasi laba kotor", 19) + dasar.RESET + ": Rp " + rupiah(r["laba"]) + "\n"
+    h = h + "  " + label + dasar.kolom_kiri("Piutang berjalan", 19) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(r["piutang"]), dasar.KUNING) + "\n"
+    h = h + "\n"
+    kembalikan h
+}
+
+fungsi rangkai_terlaris(daftar, batas) {
+    jika panjang(daftar) == 0 {
+        kembalikan ""
+    }
+    variabel h = "  " + dasar.warna("BARANG TERLARIS", dasar.TEBAL + dasar.TEKS) + "\n"
+    h = h + "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("Nama", 20, dasar.REDUP) + " " + sel_kanan("Jml", 5, dasar.REDUP) + " " + sel_kanan("Omzet", 12, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 43) + dasar.RESET + "\n"
+    variabel n = panjang(daftar)
+    jika n > batas {
+        n = batas
+    }
+    untuk i dalam rentang(n) {
+        variabel t = daftar[i]
+        h = h + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(t["nama"], 20, dasar.TEKS) + " " + sel_kanan(ke_teks(t["jumlah"]), 5, dasar.TEKS) + " " + sel_kanan(rupiah(t["omzet"]), 12, dasar.TEKS) + "\n"
+    }
+    h = h + "\n"
+    kembalikan h
+}
+
+fungsi rangkai_transaksi(rows) {
+    jika panjang(rows) == 0 {
+        kembalikan ""
+    }
+    variabel h = "  " + dasar.warna("DAFTAR TRANSAKSI", dasar.TEBAL + dasar.TEKS) + "\n"
+    h = h + "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("Kode", 15, dasar.REDUP) + " " + sel_kiri("Tanggal", 16, dasar.REDUP) + " " + sel_kanan("Total", 10, dasar.REDUP) + " " + sel_kiri("Status", 8, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 56) + dasar.RESET + "\n"
+    untuk i dalam rentang(panjang(rows)) {
+        variabel r = rows[i]
+        variabel ws = dasar.HIJAU
+        jika r["status"] == "bon" {
+            ws = dasar.KUNING
+        }
+        h = h + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(r["kode"], 15, dasar.TEKS) + " " + sel_kiri(potong(r["tanggal"], 0, 16), 16, dasar.TEKS) + " " + sel_kanan(rupiah(r["total"]), 10, dasar.TEKS) + " " + sel_kiri(r["status"], 8, ws) + "\n"
+    }
+    h = h + "\n"
+    kembalikan h
+}
+
+fungsi rangkai_rekap(rows) {
+    jika panjang(rows) == 0 {
+        kembalikan ""
+    }
+    variabel h = "  " + dasar.warna("REKAP PER HARI", dasar.TEBAL + dasar.TEKS) + "\n"
+    h = h + "  " + sel_kiri("Tanggal", 12, dasar.REDUP) + " " + sel_kanan("Transaksi", 9, dasar.REDUP) + " " + sel_kanan("Omzet", 12, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 36) + dasar.RESET + "\n"
+    untuk r dalam rows {
+        h = h + "  " + sel_kiri(r["hari"], 12, dasar.TEKS) + " " + sel_kanan(ke_teks(r["jml"]), 9, dasar.TEKS) + " " + sel_kanan(rupiah(r["omzet"]), 12, dasar.TEKS) + "\n"
+    }
+    h = h + "\n"
+    kembalikan h
+}
+
+fungsi rangkai_piutang(p) {
+    variabel h = "\n  " + dasar.warna(dasar.kolom_kiri("RINGKASAN PIUTANG", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    h = h + "  " + dasar.divider(42) + "\n"
+    h = h + "  " + dasar.REDUP + dasar.kolom_kiri("Total piutang", 18) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(p["total"]), dasar.KUNING + dasar.TEBAL) + "\n"
+    h = h + "  " + dasar.REDUP + dasar.kolom_kiri("Pelanggan berutang", 18) + dasar.RESET + ": " + ke_teks(panjang(p["daftar"])) + "\n\n"
+    jika panjang(p["daftar"]) == 0 {
+        h = h + "  " + dasar.warna("Tidak ada piutang berjalan. Warung aman, Bos!", dasar.HIJAU) + "\n\n"
+        kembalikan h
+    }
+    h = h + "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("Pelanggan", 20, dasar.REDUP) + " " + sel_kanan("Sisa utang", 12, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 37) + dasar.RESET + "\n"
+    untuk i dalam rentang(panjang(p["daftar"])) {
+        variabel r = p["daftar"][i]
+        h = h + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(r["nama"], 20, dasar.TEKS) + " " + sel_kanan(rupiah(r["sisa"]), 12, dasar.KUNING) + "\n"
+    }
+    h = h + "\n"
+    kembalikan h
+}
+
+fungsi tampilkan_periode(db, jenis) {
+    variabel r
+    jika jenis == "harian" {
+        r = laporan.harian(db)
+    } jika_lain jenis == "mingguan" {
+        r = laporan.mingguan(db)
+    } selain {
+        r = laporan.bulanan(db)
+    }
+    r["judul"] = judul_laporan(jenis)
+    variabel blok = rangkai_ringkasan(r)
+    blok = blok + rangkai_terlaris(r["terlaris"], 3)
+    jika jenis == "harian" {
+        blok = blok + rangkai_transaksi(r["transaksi"])
+    } selain {
+        blok = blok + rangkai_rekap(r["rekap"])
+    }
+    jika panjang(r["transaksi"]) == 0 dan jenis == "harian" {
+        blok = blok + "  " + dasar.warna("Belum ada transaksi pada periode ini, Bos.", dasar.REDUP) + "\n\n"
+    }
+    jika panjang(r["rekap"]) == 0 dan jenis != "harian" {
+        blok = blok + "  " + dasar.warna("Belum ada transaksi pada periode ini, Bos.", dasar.REDUP) + "\n\n"
+    }
+    blok = blok + "  " + dasar.REDUP + "[Enter] kembali" + dasar.RESET + "\n"
+    dasar.bersihkan_layar()
+    cetak(blok, akhir="")
+    dasar.dialog("Enter untuk kembali, Bos.")
+    kembalikan 0
+}
+
+fungsi tampilkan_terlaris(db) {
+    variabel r = laporan.terlaris_bulan_ini(db)
+    variabel blok = "\n  " + dasar.warna(dasar.kolom_kiri("BARANG TERLARIS — BULAN INI", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    blok = blok + "  " + dasar.divider(42) + "\n"
+    blok = blok + "  " + dasar.REDUP + "Periode: " + r["periode"] + dasar.RESET + "\n\n"
+    blok = blok + rangkai_terlaris(r["daftar"], 10)
+    jika panjang(r["daftar"]) == 0 {
+        blok = blok + "  " + dasar.warna("Belum ada penjualan bulan ini, Bos.", dasar.REDUP) + "\n\n"
+    }
+    blok = blok + "  " + dasar.REDUP + "[Enter] kembali" + dasar.RESET + "\n"
+    dasar.bersihkan_layar()
+    cetak(blok, akhir="")
+    dasar.dialog("Enter untuk kembali, Bos.")
+    kembalikan 0
+}
+
+fungsi tampilkan_piutang(db) {
+    variabel p =     laporan.piutang(db)
+    variabel blok = rangkai_piutang(p)
+    blok = blok + "  " + dasar.REDUP + "[Enter] kembali" + dasar.RESET + "\n"
+    dasar.bersihkan_layar()
+    cetak(blok, akhir="")
+    dasar.dialog("Enter untuk kembali, Bos.")
+    kembalikan 0
+}
+
+fungsi tampilkan_ekspor(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("EKSPOR CSV", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    cetak("  " + dasar.warna("[1]", dasar.NYALA) + " " + dasar.TEKS + "Harian (hari ini)" + dasar.RESET + "\n", akhir="")
+    cetak("  " + dasar.warna("[2]", dasar.NYALA) + " " + dasar.TEKS + "Mingguan (Senin-Minggu)" + dasar.RESET + "\n", akhir="")
+    cetak("  " + dasar.warna("[3]", dasar.NYALA) + " " + dasar.TEKS + "Bulanan" + dasar.RESET + "\n", akhir="")
+    cetak("  " + dasar.REDUP + "[0-3] Pilih | [0] Batal" + dasar.RESET + "\n\n", akhir="")
+    variabel p = dasar.baca_pilihan(3)
+    jika p < 1 atau p > 3 {
+        dasar.dialog("Ekspor dibatalkan ya, Bos.")
+        kembalikan 0
+    }
+    variabel jenis = "harian"
+    jika p == 2 {
+        jenis = "mingguan"
+    }
+    jika p == 3 {
+        jenis = "bulanan"
+    }
+    variabel r = laporan.ekspor_csv(db, jenis)
+    dasar.dialog("Tersimpan: " + r["path"] + " (" + ke_teks(r["jumlah"]) + " baris detail), Bos!")
+    kembalikan 0
+}
+
+fungsi jalankan(db) {
+    variabel berjalan = benar
+    variabel pesan = ""
+    selagi berjalan {
+        dasar.bersihkan_layar()
+        cetak(rangkai_menu(pesan), akhir="")
+        variabel p = dasar.baca_pilihan(6)
+        jika p == -2 {
+            berjalan = salah
+        } jika_lain p == -3 {
+            pesan = ""
+        } jika_lain p == -1 {
+            pesan = "Ketik nomor menu dulu, Bos (0-6)."
+        } jika_lain p == 0 {
+            berjalan = salah
+        } selain {
+            coba {
+                jika p == 1 {
+                    tampilkan_periode(db, "harian")
+                } jika_lain p == 2 {
+                    tampilkan_periode(db, "mingguan")
+                } jika_lain p == 3 {
+                    tampilkan_periode(db, "bulanan")
+                } jika_lain p == 4 {
+                    tampilkan_terlaris(db)
+                } jika_lain p == 5 {
+                    tampilkan_piutang(db)
+                } jika_lain p == 6 {
+                    tampilkan_ekspor(db)
+                }
+            } kecuali GalatValidasi sebagai e {
+                dasar.dialog(e.pesan)
+            }
+        }
+        pesan = ""
+    }
+    kembalikan 0
+}

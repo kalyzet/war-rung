@@ -1,0 +1,161 @@
+# layanan/laporan.idk — Periode, ringkasan, dan ekspor CSV (PRD §3.6, §8).
+
+impor repositori.laporan
+impor inti.kalender
+dari inti.galat impor GalatValidasi
+dari teks impor teks_pangkas
+
+# --- Periode --------------------------------------------------------------
+# awal inklusif, akhir eksklusif; label untuk ditampilkan.
+
+fungsi hari_ini() {
+    variabel z = kalender.z_hari_ini()
+    variabel awal = kalender.teks_civil(z)
+    kembalikan {"nama": "harian", "awal": awal, "akhir": kalender.teks_civil(z + 1), "label": awal}
+}
+
+fungsi minggu_ini() {
+    variabel senin = kalender.awal_minggu(kalender.z_hari_ini())
+    variabel awal = kalender.teks_civil(senin)
+    variabel akhir = kalender.teks_civil(senin + 7)
+    kembalikan {"nama": "mingguan", "awal": awal, "akhir": akhir, "label": awal + " s/d " + kalender.teks_civil(senin + 6)}
+}
+
+fungsi bulan_ini() {
+    variabel t = tanggal()
+    variabel awal_z = kalender.awal_bulan(t["tahun"], t["bulan"])
+    variabel b = kalender.bulan_berikut(t["tahun"], t["bulan"])
+    variabel akhir_z = kalender.awal_bulan(b[0], b[1])
+    kembalikan {"nama": "bulanan", "awal": kalender.teks_civil(awal_z), "akhir": kalender.teks_civil(akhir_z), "label": potong(kalender.teks_civil(awal_z), 0, 7) + " (bulan berjalan)"}
+}
+
+fungsi periode_dari(jenis) {
+    jika jenis == "harian" {
+        kembalikan hari_ini()
+    }
+    jika jenis == "mingguan" {
+        kembalikan minggu_ini()
+    }
+    jika jenis == "bulanan" {
+        kembalikan bulan_ini()
+    }
+    naikkan GalatValidasi("Jenis laporan '" + jenis + "' tidak dikenal, Bos.")
+}
+
+# --- Ringkasan ------------------------------------------------------------
+
+fungsi ringkasan(db, p) {
+    variabel r = laporan.ringkasan(db, p["awal"], p["akhir"])
+    variabel l = laporan.laba_kotor(db, p["awal"], p["akhir"])
+    variabel pi = laporan.piutang_total(db)
+    kembalikan {
+        "periode": p["label"],
+        "jumlah": r["jml"],
+        "omzet": r["omzet"],
+        "laba": l["laba"],
+        "piutang": pi["jml"],
+        "transaksi": laporan.daftar_transaksi(db, p["awal"], p["akhir"]),
+        "rekap": laporan.rekap_harian(db, p["awal"], p["akhir"]),
+        "terlaris": laporan.terlaris(db, p["awal"], p["akhir"], 3)
+    }
+}
+
+fungsi harian(db) {
+    kembalikan ringkasan(db, hari_ini())
+}
+
+fungsi mingguan(db) {
+    kembalikan ringkasan(db, minggu_ini())
+}
+
+fungsi bulanan(db) {
+    kembalikan ringkasan(db, bulan_ini())
+}
+
+fungsi terlaris_bulan_ini(db) {
+    variabel p = bulan_ini()
+    kembalikan {"periode": p["label"], "daftar": laporan.terlaris(db, p["awal"], p["akhir"], 10)}
+}
+
+fungsi piutang(db) {
+    variabel total = laporan.piutang_total(db)
+    variabel baris = laporan.piutang_pelanggan(db)
+    variabel daftar = []
+    untuk r dalam baris {
+        jika r["sisa"] > 0 {
+            tambah(daftar, r)
+        }
+    }
+    kembalikan {"total": total["jml"], "daftar": daftar}
+}
+
+# --- Ekspor CSV -----------------------------------------------------------
+
+fungsi csv_sel(t) {
+    variabel s = ke_teks(t)
+    variabel hasil = ""
+    untuk i dalam rentang(panjang(s)) {
+        variabel c = potong(s, i, 1)
+        jika c == "\"" {
+            hasil = hasil + "\"\""
+        } selain {
+            hasil = hasil + c
+        }
+    }
+    kembalikan "\"" + hasil + "\""
+}
+
+fungsi csv_baris(kolom) {
+    variabel bagian = []
+    untuk k dalam kolom {
+        tambah(bagian, csv_sel(k))
+    }
+    variabel h = ""
+    untuk i dalam rentang(panjang(bagian)) {
+        jika i > 0 {
+            h = h + ","
+        }
+        h = h + bagian[i]
+    }
+    kembalikan h + "\r\n"
+}
+
+fungsi z_dari_teks(teks) {
+    variabel t = ke_bulat(ke_angka(potong(teks, 0, 4)))
+    variabel b = ke_bulat(ke_angka(potong(teks, 5, 2)))
+    variabel h = ke_bulat(ke_angka(potong(teks, 8, 2)))
+    kembalikan kalender.hari_dari_civil(t, b, h)
+}
+
+fungsi nama_berkas(p) {
+    kembalikan "laporan-" + p["nama"] + "-" + p["awal"] + "-" + kalender.teks_civil(z_dari_teks(p["akhir"]) - 1) + ".csv"
+}
+
+fungsi ekspor_csv(db, jenis) {
+    variabel p = periode_dari(jenis)
+    variabel isi = csv_baris(["kode", "tanggal", "barang", "jumlah", "harga_satuan", "harga_beli", "subtotal", "laba"])
+    variabel baris = laporan.detail_transaksi_periode(db, p["awal"], p["akhir"])
+    untuk r dalam baris {
+        isi = isi + csv_baris([r["kode"], r["tanggal"], r["nama_barang"], r["jumlah"], r["harga_satuan"], r["harga_beli"], r["subtotal"], r["jumlah"] * (r["harga_satuan"] - r["harga_beli"])])
+    }
+    variabel r = laporan.ringkasan(db, p["awal"], p["akhir"])
+    variabel l = laporan.laba_kotor(db, p["awal"], p["akhir"])
+    isi = isi + "\r\n"
+    isi = isi + csv_baris(["ringkasan", "nilai"])
+    isi = isi + csv_baris(["periode", p["label"]])
+    isi = isi + csv_baris(["total transaksi", r["jml"]])
+    isi = isi + csv_baris(["omzet", r["omzet"]])
+    isi = isi + csv_baris(["laba kotor", l["laba"]])
+    coba {
+        coba {
+            isi_direktori("laporan")
+        } kecuali Galat {
+            buat_direktori("laporan")
+        }
+        variabel path = "laporan/" + nama_berkas(p)
+        tulis_semua(path, isi)
+        kembalikan {"path": path, "jumlah": panjang(baris)}
+    } kecuali Galat sebagai e {
+        naikkan GalatValidasi("Gagal menulis berkas laporan: " + e.pesan)
+    }
+}

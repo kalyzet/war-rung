@@ -1,0 +1,35 @@
+# repositori/laporan.idk — Kueri laporan penjualan (PRD §3.6, §7.3).
+# Semua kueri memakai parameter '?' — rentang tanggal eksklusif di akhir
+# (tanggal >= awal DAN tanggal < akhir), tanpa interpolasi string ke SQL.
+
+fungsi ringkasan(db, awal, akhir) {
+    kembalikan db_ambil_satu(db, "SELECT COUNT(*) AS jml, COALESCE(SUM(total), 0) AS omzet FROM transaksi WHERE status != 'batal' AND tanggal >= ? AND tanggal < ?", [awal, akhir])
+}
+
+fungsi laba_kotor(db, awal, akhir) {
+    kembalikan db_ambil_satu(db, "SELECT COALESCE(SUM(d.jumlah * (d.harga_satuan - d.harga_beli)), 0) AS laba FROM detail_transaksi d JOIN transaksi t ON t.id = d.transaksi_id WHERE t.status != 'batal' AND t.tanggal >= ? AND t.tanggal < ?", [awal, akhir])
+}
+
+fungsi daftar_transaksi(db, awal, akhir) {
+    kembalikan db_ambil_semua(db, "SELECT kode, tanggal, total, status FROM transaksi WHERE status != 'batal' AND tanggal >= ? AND tanggal < ? ORDER BY tanggal ASC, kode ASC", [awal, akhir])
+}
+
+fungsi rekap_harian(db, awal, akhir) {
+    kembalikan db_ambil_semua(db, "SELECT substr(tanggal, 1, 10) AS hari, COUNT(*) AS jml, COALESCE(SUM(total), 0) AS omzet FROM transaksi WHERE status != 'batal' AND tanggal >= ? AND tanggal < ? GROUP BY substr(tanggal, 1, 10) ORDER BY hari ASC", [awal, akhir])
+}
+
+fungsi terlaris(db, awal, akhir, batas) {
+    kembalikan db_ambil_semua(db, "SELECT d.nama_barang AS nama, SUM(d.jumlah) AS jumlah, SUM(d.subtotal) AS omzet FROM detail_transaksi d JOIN transaksi t ON t.id = d.transaksi_id WHERE t.status != 'batal' AND t.tanggal >= ? AND t.tanggal < ? GROUP BY d.barang_id ORDER BY jumlah DESC, omzet DESC, d.nama_barang ASC LIMIT ?", [awal, akhir, batas])
+}
+
+fungsi piutang_total(db) {
+    kembalikan db_ambil_satu(db, "SELECT COALESCE(SUM(t.total - t.dibayar - COALESCE(p.bayar, 0)), 0) AS jml FROM transaksi t LEFT JOIN (SELECT transaksi_id, SUM(jumlah) AS bayar FROM pembayaran_bon GROUP BY transaksi_id) p ON p.transaksi_id = t.id WHERE t.status = 'bon'")
+}
+
+fungsi piutang_pelanggan(db) {
+    kembalikan db_ambil_semua(db, "SELECT p.id AS pelanggan_id, p.nama, COALESCE(SUM(t.total - t.dibayar - COALESCE(pay.bayar, 0)), 0) AS sisa FROM pelanggan p JOIN transaksi t ON t.pelanggan_id = p.id AND t.status = 'bon' LEFT JOIN (SELECT transaksi_id, SUM(jumlah) AS bayar FROM pembayaran_bon GROUP BY transaksi_id) pay ON pay.transaksi_id = t.id GROUP BY p.id, p.nama ORDER BY sisa DESC, p.nama ASC")
+}
+
+fungsi detail_transaksi_periode(db, awal, akhir) {
+    kembalikan db_ambil_semua(db, "SELECT t.kode, t.tanggal, d.nama_barang, d.jumlah, d.harga_satuan, d.harga_beli, d.subtotal FROM detail_transaksi d JOIN transaksi t ON t.id = d.transaksi_id WHERE t.status != 'batal' AND t.tanggal >= ? AND t.tanggal < ? ORDER BY t.tanggal ASC, t.kode ASC, d.id ASC", [awal, akhir])
+}

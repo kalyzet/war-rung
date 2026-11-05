@@ -57,3 +57,6 @@ dist/
 coverage/
 *.coverage
 test-results/
+
+# Hasil Ekspor Laporan (dibuat aplikasi)
+/

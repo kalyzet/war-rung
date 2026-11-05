@@ -120,6 +120,13 @@ Jika stok menipis saat kasir memasukkan barang, muncul **dialog inline** bergaya
 - **Pencarian:** Cari pelanggan/barang dengan mengetik kata kunci lalu `Enter` (input berbasis baris), hasil disaring dan daftar dirender ulang.
 - **Pembayaran cicilan:** pilih tagihan dari Buku Kas → masukkan nominal → konfirmasi; saat sisa utang 0, status berubah "lunas" dan ditandai hijau.
 
+### 5.5. Modul Laporan Penjualan
+
+- **Konsep:** Layar laporan memakai panel berbingkai ASCII + garis pembatas anyaman, konsisten dengan layar lain; angka keuangan disorot (omzet hijau tebal, piutang kuning).
+- **Menu:** `[1]` Harian, `[2]` Mingguan (Senin–Minggu), `[3]` Bulanan, `[4]` Barang terlaris, `[5]` Ringkasan piutang, `[6]` Ekspor CSV, `[0]` Kembali — masing-masing layar berakhir dengan dialog `[Enter] kembali`.
+- **Tata letak layar ringkasan:** baris label lebar 19 kolom (Periode, Total transaksi, Total omzet, Estimasi laba kotor, Piutang berjalan) → blok "Barang Terlaris" (No/Nama/Jml/Omzet) → blok "Daftar Transaksi" (kode/tanggal/total/status; status lunas hijau, bon kuning); mingguan/bulanan menambah "Rekap per Hari".
+- **Ekspor:** submenu `[1-3]` menulis CSV ke folder `laporan/` (nama `laporan-<jenis>-<awal>-<akhir>.csv`), konfirmasi via dialog "Tersimpan: laporan/...".
+
 ## 6. Aksesibilitas & Ramah Pengguna
 
 1. **Bahasa Manusia (Human-Centric Copywriting):**

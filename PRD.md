@@ -505,7 +505,7 @@ Aktivitas:
 - Barang terlaris.
 - Ekspor laporan CSV.
 
-Hasil: Modul laporan operasional.
+Hasil: Modul laporan — **selesai** (uji laporan 9/9; seluruh uji 48/48 lulus, periksa 0 temuan, skenario aplikasi end-to-end lulus: 2 transaksi lunas+bon → laporan harian/mingguan/bulanan → barang terlaris → ringkasan piutang → ekspor 3 berkas CSV).
 
 ### Fase 6 — Testing and Release
 
@@ -623,4 +623,4 @@ Selain menghasilkan aplikasi yang berfungsi, proyek ini diharapkan memberikan ga
 **Dokumen:** PRD.md  
 **Proyek:** War-Rung  
 **Versi Dokumen:** 1.1.0  
-**Status:** Draft — Fase 0–4 selesai (PoC, fondasi, barang, kasir, stok & piutang; seluruh uji 39/39 lulus, periksa 0 temuan, skenario aplikasi lulus); menuju Fase 5
+**Status:** Draft — Fase 0–5 selesai (PoC, fondasi, barang, kasir, stok & piutang, laporan; seluruh uji 48/48 lulus, periksa 0 temuan, skenario aplikasi lulus); menuju Fase 6 (Testing and Release)

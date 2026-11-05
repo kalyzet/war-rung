@@ -1,0 +1,215 @@
+# uji_laporan.idk — Uji otomatis Fase 5 (Laporan Penjualan, PRD §3.6, §8).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_laporan.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+impor inti.kalender
+impor layanan.barang
+impor layanan.pelanggan
+impor layanan.laporan
+dari teks impor teks_berisi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi tgl() {
+    kembalikan format_tanggal("%Y-%m-%d")
+}
+
+fungsi siap(db) {
+    barang.tambah(db, {"sku": "SKU-KOPI", "nama": "Kopi Senja", "harga_beli": 5000, "harga_jual": 7000, "stok": 99, "stok_minimum": 2})
+    barang.tambah(db, {"sku": "SKU-TEH", "nama": "Teh Manis", "harga_beli": 3000, "harga_jual": 5000, "stok": 99, "stok_minimum": 2})
+}
+
+fungsi id_barang(db, sku) {
+    variabel r = db_ambil_satu(db, "SELECT id FROM barang WHERE sku = ?", [sku])
+    kembalikan r["id"]
+}
+
+# baris: daftar dict {bid, nama, hs, hb, jml}
+fungsi trx(db, kode, tanggal, status, baris) {
+    variabel subtotal = 0
+    untuk r dalam baris {
+        subtotal = subtotal + r["hs"] * r["jml"]
+    }
+    variabel bayar = subtotal
+    jika status == "bon" {
+        bayar = 0
+    }
+    db_eksekusi(db, "INSERT INTO transaksi (kode, pelanggan_id, tanggal, subtotal, diskon, total, dibayar, kembalian, status) VALUES (?, NULL, ?, ?, 0, ?, ?, 0, ?)", [kode, tanggal, subtotal, subtotal, bayar, status])
+    variabel id = db_id_terakhir(db)
+    untuk r dalam baris {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)", [id, r["bid"], r["nama"], r["hs"], r["hb"], r["jml"], r["hs"] * r["jml"]])
+    }
+    kembalikan id
+}
+
+fungsi trx_bon(db, pid, tanggal, baris) {
+    variabel subtotal = 0
+    untuk r dalam baris {
+        subtotal = subtotal + r["hs"] * r["jml"]
+    }
+    db_eksekusi(db, "INSERT INTO transaksi (kode, pelanggan_id, tanggal, subtotal, diskon, total, dibayar, kembalian, status) VALUES ('BON1', ?, ?, ?, 0, ?, 0, 0, 'bon')", [pid, tanggal, subtotal, subtotal])
+    kembalikan db_id_terakhir(db)
+}
+
+fungsi uji_bulanan_rentang() {
+    variabel db = db_segar()
+    siap(db)
+    variabel k = id_barang(db, "SKU-KOPI")
+    variabel lalu = kalender.teks_civil(kalender.z_awal_bulan_ini() - 1) + " 09:00:00"
+    trx(db, "BLN-LAMA", lalu, "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 5}])
+    trx(db, "BLN-ANYAR", tgl() + " 09:00:00", "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 2}])
+    variabel b = laporan.bulanan(db)
+    pastikan b["jumlah"] == 1, "bulanan hanya transaksi bulan ini"
+    pastikan b["omzet"] == 14000, "omzet bulanan 14000"
+    variabel t = laporan.terlaris_bulan_ini(db)
+    pastikan panjang(t["daftar"]) >= 1, "terlaris bulan ini terisi"
+    pastikan t["daftar"][0]["jumlah"] == 2, "terlaris bulan ini qty 2"
+    db_tutup(db)
+}
+
+fungsi uji_ekspor_csv() {
+    variabel db = db_segar()
+    siap(db)
+    variabel k = id_barang(db, "SKU-KOPI")
+    trx(db, "E1", tgl() + " 09:00:00", "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 2}])
+    trx(db, "E2", tgl() + " 10:00:00", "batal", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 1}])
+    variabel r = laporan.ekspor_csv(db, "harian")
+    pastikan r["jumlah"] == 1, "csv hanya transaksi aktif"
+    pastikan teks_berisi(r["path"], "laporan-harian-"), "nama berkas harian"
+    variabel isi = baca_semua(r["path"])
+    pastikan teks_berisi(isi, "kode"), "header csv ada"
+    pastikan teks_berisi(isi, "E1"), "transaksi E1 ikut"
+    pastikan teks_berisi(isi, "E2") == salah, "transaksi batal tidak ikut"
+    pastikan teks_berisi(isi, "laba kotor"), "bagian ringkasan ikut"
+    pastikan teks_berisi(isi, "omzet"), "baris omzet ikut"
+    db_tutup(db)
+}
+
+fungsi uji_jenis_tidak_dikenal() {
+    variabel db = db_segar()
+    variabel pesan = ""
+    coba {
+        laporan.periode_dari("tahunan")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "jenis periode salah ditolak"
+    pastikan teks_berisi(pesan, "tidak dikenal"), "pesan jenis ramah"
+    pesan = ""
+    coba {
+        laporan.ekspor_csv(db, "kuartal")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "ekspor jenis salah ditolak"
+    db_tutup(db)
+}
+
+fungsi uji_mingguan_rentang() {
+    variabel db = db_segar()
+    siap(db)
+    variabel k = id_barang(db, "SKU-KOPI")
+    variabel lama = kalender.teks_civil(kalender.z_hari_ini() - 8) + " 09:00:00"
+    trx(db, "LAMA", lama, "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 1}])
+    trx(db, "BARU", tgl() + " 09:00:00", "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 3}])
+    variabel m = laporan.mingguan(db)
+    pastikan m["jumlah"] == 1, "mingguan hanya transaksi minggu ini"
+    pastikan m["omzet"] == 21000, "omzet mingguan 21000"
+    pastikan panjang(m["transaksi"]) == 1, "daftar mingguan satu baris"
+    db_tutup(db)
+}
+
+fungsi uji_periode_dasar() {
+    variabel db = db_segar()
+    variabel h = laporan.hari_ini()
+    pastikan h["awal"] == tgl(), "harian awal = hari ini"
+    pastikan laporan.z_dari_teks(h["akhir"]) - laporan.z_dari_teks(h["awal"]) == 1, "harian rentang 1 hari"
+    variabel m = laporan.minggu_ini()
+    pastikan kalender.hari_dalam_minggu(laporan.z_dari_teks(m["awal"])) == 0, "minggu mulai Senin"
+    pastikan laporan.z_dari_teks(m["akhir"]) - laporan.z_dari_teks(m["awal"]) == 7, "minggu rentang 7 hari"
+    variabel b = laporan.bulan_ini()
+    pastikan potong(b["awal"], 8, 2) == "01", "bulan awal tanggal 1"
+    pastikan laporan.z_dari_teks(b["akhir"]) > laporan.z_dari_teks(b["awal"]), "bulan akhir setelah awal"
+    db_tutup(db)
+}
+
+fungsi uji_piutang_ringkasan() {
+    variabel db = db_segar()
+    siap(db)
+    pelanggan.tambah(db, {"nama": "Bu Rini", "telepon": "", "alamat": ""})
+    variabel p = pelanggan.cari(db, "Bu Rini")[0]
+    variabel k = id_barang(db, "SKU-KOPI")
+    variabel id = trx_bon(db, p["id"], tgl() + " 12:00:00", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 2}])
+    db_eksekusi(db, "INSERT INTO pembayaran_bon (transaksi_id, jumlah, tanggal, catatan) VALUES (?, ?, ?, '')", [id, 4000, tgl() + " 13:00:00"])
+    variabel r = laporan.piutang(db)
+    pastikan r["total"] == 10000, "piutang total 10000"
+    pastikan panjang(r["daftar"]) == 1, "satu pelanggan berutang"
+    pastikan r["daftar"][0]["nama"] == "Bu Rini", "nama Bu Rini"
+    pastikan r["daftar"][0]["sisa"] == 10000, "sisa 10000"
+    db_eksekusi(db, "INSERT INTO pembayaran_bon (transaksi_id, jumlah, tanggal, catatan) VALUES (?, ?, ?, '')", [id, 10000, tgl() + " 14:00:00"])
+    r = laporan.piutang(db)
+    pastikan r["total"] == 0, "setelah lunas total 0"
+    pastikan panjang(r["daftar"]) == 0, "setelah lunas daftar kosong"
+    db_tutup(db)
+}
+
+fungsi uji_ringkasan_harian() {
+    variabel db = db_segar()
+    siap(db)
+    variabel k = id_barang(db, "SKU-KOPI")
+    variabel t = id_barang(db, "SKU-TEH")
+    trx(db, "H1", tgl() + " 09:00:00", "lunas", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 2}])
+    trx(db, "H2", tgl() + " 10:00:00", "lunas", [{"bid": t, "nama": "Teh Manis", "hs": 5000, "hb": 3000, "jml": 1}])
+    trx(db, "H3", tgl() + " 11:00:00", "batal", [{"bid": k, "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 9}])
+    variabel h = laporan.harian(db)
+    pastikan h["jumlah"] == 2, "transaksi batal tidak dihitung"
+    pastikan h["omzet"] == 19000, "omzet 19000"
+    pastikan h["laba"] == 6000, "laba kotor 6000"
+    pastikan panjang(h["transaksi"]) == 2, "daftar transaksi dua baris"
+    pastikan panjang(h["rekap"]) == 1, "rekap satu hari"
+    pastikan h["rekap"][0]["jml"] == 2, "rekap jumlah 2"
+    pastikan h["rekap"][0]["omzet"] == 19000, "rekap omzet 19000"
+    pastikan h["terlaris"][0]["nama"] == "Kopi Senja", "terlaris Kopi Senja"
+    pastikan h["terlaris"][0]["jumlah"] == 2, "terlaris qty 2 tanpa batal"
+    db_tutup(db)
+}
+
+fungsi uji_ringkasan_kosong() {
+    variabel db = db_segar()
+    variabel h = laporan.harian(db)
+    pastikan h["jumlah"] == 0, "basis kosong: 0 transaksi"
+    pastikan h["omzet"] == 0, "basis kosong: omzet 0"
+    pastikan h["laba"] == 0, "basis kosong: laba 0"
+    pastikan panjang(h["transaksi"]) == 0, "basis kosong: tanpa daftar"
+    pastikan panjang(h["rekap"]) == 0, "basis kosong: tanpa rekap"
+    pastikan panjang(h["terlaris"]) == 0, "basis kosong: tanpa terlaris"
+    db_tutup(db)
+}
+
+fungsi uji_terlaris_urutan() {
+    variabel db = db_segar()
+    siap(db)
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum, aktif) VALUES ('SKU-G', 'Gula', 4000, 6000, 9, 1, 1)")
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum, aktif) VALUES ('SKU-S', 'Susu', 8000, 10000, 9, 1, 1)")
+    variabel jam = tgl() + " 09:00:00"
+    trx(db, "Q1", jam, "lunas", [{"bid": id_barang(db, "SKU-KOPI"), "nama": "Kopi Senja", "hs": 7000, "hb": 5000, "jml": 1}])
+    trx(db, "Q2", jam, "lunas", [{"bid": id_barang(db, "SKU-TEH"), "nama": "Teh Manis", "hs": 5000, "hb": 3000, "jml": 2}])
+    trx(db, "Q3", jam, "lunas", [{"bid": id_barang(db, "SKU-G"), "nama": "Gula", "hs": 6000, "hb": 4000, "jml": 3}])
+    trx(db, "Q4", jam, "lunas", [{"bid": id_barang(db, "SKU-S"), "nama": "Susu", "hs": 10000, "hb": 8000, "jml": 4}])
+    variabel h = laporan.harian(db)
+    pastikan panjang(h["terlaris"]) == 3, "ringkasan batasi 3 teratas"
+    pastikan h["terlaris"][0]["nama"] == "Susu", "Susu qty 4 di puncak"
+    pastikan h["terlaris"][0]["jumlah"] == 4, "qty puncak 4"
+    pastikan h["terlaris"][1]["nama"] == "Gula", "Gula qty 3 kedua"
+    pastikan h["terlaris"][2]["nama"] == "Teh Manis", "Teh Manis qty 2 ketiga"
+    variabel t = laporan.terlaris_bulan_ini(db)
+    pastikan panjang(t["daftar"]) == 4, "daftar lebar muat 4 produk"
+    db_tutup(db)
+}
