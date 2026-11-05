@@ -1,0 +1,29 @@
+# model/barang.idk — Bentuk data barang dan konversi baris basis data (PRD §3.1, §6.1).
+
+fungsi dari_baris(baris) {
+    kembalikan {
+        "id": baris["id"],
+        "sku": baris["sku"],
+        "nama": baris["nama"],
+        "harga_beli": baris["harga_beli"],
+        "harga_jual": baris["harga_jual"],
+        "stok": baris["stok"],
+        "stok_minimum": baris["stok_minimum"],
+        "aktif": baris["aktif"] == 1
+    }
+}
+
+fungsi dari_baris_banyak(baris) {
+    variabel hasil = []
+    untuk b dalam baris {
+        tambah(hasil, dari_baris(b))
+    }
+    kembalikan hasil
+}
+
+fungsi status_teks(b) {
+    jika b["aktif"] {
+        kembalikan "aktif"
+    }
+    kembalikan "nonaktif"
+}

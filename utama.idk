@@ -1,0 +1,92 @@
+# utama.idk — Titik masuk aplikasi War-Rung.
+# Fase 1: fondasi database + menu bernomor + penanganan galat dasar.
+# Jalankan lewat warung.cmd (menyiapkan INDK_PATH dan CWD di akar proyek).
+
+impor konfigurasi
+impor inti.koneksi
+impor basis_data.seed
+impor tampilan.dasar
+impor tampilan.barang
+impor inti.papan
+dari teks impor teks_ulang
+
+variabel PILIHAN = ["Masuk ke Kasir", "Kelola Barang", "Laporan Penjualan", "Pengaturan"]
+
+# Satu blok layar dirangkai penuh lalu dicetak sekali (DESIGN §5.2).
+fungsi rangkai_layar(peringatan, kosong_berturut, ringkas) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna(dasar.kolom_kiri("WAR-RUNG — Teras Warung", 34), dasar.TEBAL + dasar.TEKS) + dasar.REDUP + konfigurasi.VERSI + dasar.RESET + "\n"
+    b = b + "  " + dasar.divider(42) + "\n\n"
+    untuk i dalam rentang(1, panjang(PILIHAN) + 1) {
+        b = b + "  " + dasar.warna("[" + ke_teks(i) + "]", dasar.NYALA) + " " + dasar.TEKS + PILIHAN[i - 1] + dasar.RESET + "\n"
+    }
+    b = b + "\n"
+    b = b + "  " + dasar.warna("┌ Papan Tulis " + teks_ulang("─", 24) + "┐▒", dasar.KUNING) + "\n"
+    b = b + "  " + dasar.warna("│" + dasar.kolom_kiri("Transaksi hari ini : " + ringkas["penjualan"], 37) + "│▒", dasar.TEKS) + "\n"
+    b = b + "  " + dasar.warna("│" + dasar.kolom_kiri("Piutang berjalan    : " + ringkas["piutang"], 37) + "│▒", dasar.TEKS) + "\n"
+    b = b + "  " + dasar.warna("│" + dasar.kolom_kiri("Paling laris        : " + ringkas["laris"], 37) + "│▒", dasar.TEKS) + "\n"
+    b = b + "  " + dasar.warna("│" + dasar.kolom_kiri("Barang aktif        : " + ringkas["aktif"], 37) + "│▒", dasar.TEKS) + "\n"
+    b = b + "  " + dasar.warna("└" + teks_ulang("─", 37) + "┘▒", dasar.KUNING) + "\n"
+    b = b + "  " + dasar.warna(" " + teks_ulang("▒", 39), dasar.KUNING) + "\n"
+    jika panjang(peringatan) > 0 {
+        b = b + "\n  " + dasar.warna("! " + peringatan, dasar.MERAH) + "\n"
+    }
+    jika kosong_berturut >= 2 {
+        b = b + "  " + dasar.warna("(Enter kosong " + ke_teks(kosong_berturut) + "/5 — ketik nomor menu atau 0 untuk keluar)", dasar.REDUP) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[1-" + ke_teks(panjang(PILIHAN)) + "] Pilih | [Enter] Konfirmasi | [0] Keluar" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi aplikasi() {
+    variabel db = koneksi.buka_db()
+    koneksi.siapkan_skema(db)
+    seed.jika_kosong(db)
+
+    variabel berjalan = benar
+    variabel peringatan = ""
+    variabel kosong_berturut = 0
+    selagi berjalan {
+        dasar.bersihkan_layar()
+        variabel ringkas = papan.ambil_papan(db)
+        cetak(rangkai_layar(peringatan, kosong_berturut, ringkas), akhir="")
+        variabel p = dasar.baca_pilihan(panjang(PILIHAN))
+        jika p == -2 {
+            berjalan = salah
+        } jika_lain p == -3 {
+            kosong_berturut = kosong_berturut + 1
+            peringatan = ""
+            jika kosong_berturut >= 5 {
+                berjalan = salah
+            }
+        } jika_lain p == -1 {
+            kosong_berturut = 0
+            peringatan = "Ketik nomor menu dulu, Bos (1-" + ke_teks(panjang(PILIHAN)) + ")."
+        } jika_lain p == 0 {
+            berjalan = salah
+        } selain {
+            kosong_berturut = 0
+            peringatan = ""
+            jika p == 2 {
+                barang.jalankan(db)
+            } selain {
+                dasar.dialog("Modul " + PILIHAN[p - 1] + " menyusul di fase berikutnya, Bos.")
+            }
+        }
+    }
+    koneksi.tutup_db(db)
+    kembalikan 0
+}
+
+coba {
+    keluar(aplikasi())
+} kecuali GalatNilai sebagai e {
+    cetak("")
+    cetak(dasar.warna("  Waduh, datanya bermasalah: " + e.pesan, dasar.MERAH))
+    cetak(dasar.warna("  Coba jalankan ulang aplikasinya ya, Bos.", dasar.REDUP))
+    keluar(1)
+} kecuali Galat sebagai e {
+    cetak("")
+    cetak(dasar.warna("  Aplikasi mengalami gangguan: " + e.pesan, dasar.MERAH))
+    keluar(70)
+}

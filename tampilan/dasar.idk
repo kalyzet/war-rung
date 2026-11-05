@@ -1,0 +1,102 @@
+# tampilan/dasar.idk — Blok bangunan tampilan terminal.
+# Aturan PoC (POC-HASIL §2.3): layout dihitung dari teks polos,
+# warna dipasang sesudahnya — panjang() ikut menghitung karakter ANSI.
+
+dari teks impor teks_pangkas, teks_berisi, teks_ulang
+
+variabel ESC = chr(27)
+variabel RESET = ESC + "[0m"
+variabel TEBAL = ESC + "[1m"
+variabel TEKS = ESC + "[37m"
+variabel KUNING = ESC + "[33m"
+variabel HIJAU = ESC + "[32m"
+variabel MERAH = ESC + "[31m"
+variabel REDUP = ESC + "[90m"
+variabel NYALA = ESC + "[43m" + ESC + "[30m"
+
+fungsi warna(teks, kode) {
+    kembalikan kode + teks + RESET
+}
+
+fungsi kolom_kiri(teks, lebar) {
+    variabel k = ke_teks(teks)
+    selagi panjang(k) < lebar {
+        k = k + " "
+    }
+    jika panjang(k) > lebar {
+        kembalikan potong(k, 0, lebar)
+    }
+    kembalikan k
+}
+
+fungsi kolom_kanan(teks, lebar) {
+    variabel k = ke_teks(teks)
+    selagi panjang(k) < lebar {
+        k = " " + k
+    }
+    jika panjang(k) > lebar {
+        kembalikan potong(k, panjang(k) - lebar, lebar)
+    }
+    kembalikan k
+}
+
+fungsi bersihkan_layar() {
+    cetak(ESC + "[2J" + ESC + "[H", akhir="")
+}
+
+# Divider motif tradisional (DESIGN §3.2).
+fungsi divider(lebar) {
+    variabel s = ""
+    selagi panjang(s) < lebar {
+        s = s + "≈≈≈≈♦"
+    }
+    kembalikan warna(potong(s, 0, lebar), KUNING)
+}
+
+# Dialog panel 3D (DESIGN §3.1), menunggu Enter.
+fungsi dialog(pesan) {
+    variabel isi = " " + pesan + " "
+    variabel lebar = panjang(isi)
+    cetak("  " + warna("╔" + teks_ulang("═", lebar) + "╗▒", KUNING))
+    cetak("  " + warna("║" + isi + "║▒", TEKS))
+    cetak("  " + warna("╚" + teks_ulang("═", lebar) + "╝▒", KUNING))
+    cetak("   " + warna(teks_ulang("▒", lebar + 2), KUNING))
+    coba {
+        input("  [Enter] lanjut ")
+    } kecuali Galat {
+        kembalikan 0
+    }
+    kembalikan 0
+}
+
+# Hasil: 0..batas (sah) | -1 (tidak dikenal) | -2 (stdin habis)
+#        | -3 (kosong/Enter saja).
+fungsi baca_pilihan(batas) {
+    variabel jawab = ""
+    coba {
+        jawab = input("> ")
+    } kecuali Galat {
+        kembalikan -2
+    }
+    # input() mengembalikan kosong (tanpa galat) saat stdin habis.
+    jika jawab == kosong {
+        kembalikan -2
+    }
+    jawab = teks_pangkas(jawab)
+    jika panjang(jawab) == 0 {
+        kembalikan -3
+    }
+    jika teks_berisi(jawab, ".") atau teks_berisi(jawab, ",") {
+        kembalikan -1
+    }
+    variabel n = 0
+    coba {
+        n = ke_angka(jawab)
+    } kecuali Galat {
+        kembalikan -1
+    }
+    jika n < 0 atau n > batas {
+        kembalikan -1
+    }
+    kembalikan n
+}

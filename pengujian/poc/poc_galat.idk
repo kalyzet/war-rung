@@ -1,0 +1,78 @@
+# PoC 2 - Galat: subkelas ber-init, rantai kecuali, tuple tipe, re-raise,
+# pastikan, akhirnya.
+
+kelas GalatWarung < Galat {
+    init(pesan) { diri.pesan = pesan }
+}
+
+cetak("== 1. naikkan objek subkelas ==")
+coba {
+    naikkan GalatWarung("stok kurang")
+} kecuali GalatWarung sebagai e {
+    cetak("tertangkap GalatWarung:", e.pesan)
+    pastikan e.pesan == "stok kurang", "pesan galat harus utuh"
+}
+
+cetak("== 2. re-raise (naikkan e) ==")
+fungsi lapisan_dalam() {
+    naikkan GalatWarung("dari lapisan dalam")
+}
+coba {
+    coba {
+        lapisan_dalam()
+    } kecuali GalatWarung sebagai e {
+        naikkan e
+    }
+} kecuali GalatWarung sebagai e {
+    cetak("re-raise sampai luar:", e.pesan)
+    pastikan e.pesan == "dari lapisan dalam", "pesan tidak boleh hilang saat re-raise"
+}
+
+cetak("== 3. kecuali bertipe ganda (tuple) ==")
+coba {
+    naikkan GalatWarung("tipe ganda")
+} kecuali (GalatTipe, GalatWarung) sebagai e {
+    cetak("tuple cocok:", e.pesan)
+    pastikan e.pesan == "tipe ganda"
+}
+
+cetak("== 4. naikkan teks polos (bukan objek) ==")
+coba {
+    naikkan "teks polos"
+} kecuali e {
+    cetak("tertangkap teks:", repr(e))
+    pastikan e == "teks polos"
+}
+
+cetak("== 5. pastikan dengan pesan ==")
+coba {
+    pastikan 1 == 2, "satu tidak sama dengan dua"
+} kecuali Galat sebagai e {
+    cetak("pastikan menaikkan:", e.pesan)
+    pastikan e.pesan == "satu tidak sama dengan dua", "pesan pastikan harus identik"
+}
+
+cetak("== 6. galat runtime tertangkap (klaim SPESIFIKASI: semua) ==")
+coba {
+    buang variabel_yang_tidak_ada
+} kecuali GalatNama sebagai e {
+    cetak("GalatNama:", e.pesan)
+}
+
+cetak("== 7. akhirnya tetap jalan ==")
+variabel kecuali_jalan = salah
+coba {
+    naikkan GalatWarung("x")
+} kecuali GalatWarung sebagai e {
+    kecuali_jalan = benar
+} akhirnya {
+    pastikan kecuali_jalan == benar, "kecuali harus jalan dulu"
+    cetak("akhirnya OK")
+}
+
+cetak("== 8. turunan_dari & adalah_instansi pada kelas galat ==")
+cetak("GalatWarung turunan Galat:", turunan_dari(GalatWarung, Galat))
+cetak("instansi GalatWarung adalah Galat:", adalah_instansi(GalatWarung("y"), Galat))
+pastikan turunan_dari(GalatWarung, Galat), "subkelas harus turunan Galat"
+
+cetak("SELESAI-POC-2")

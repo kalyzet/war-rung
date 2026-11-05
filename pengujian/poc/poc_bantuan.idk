@@ -1,0 +1,5 @@
+# Modul bantuan untuk PoC 4 - Modul
+variabel konstanta = "dari-bantuan"
+
+fungsi fungsi_bantuan(n) { kembalikan n * 2 }
+fungsi halo(nama) { kembalikan "Halo " + nama }

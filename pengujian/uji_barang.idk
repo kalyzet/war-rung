@@ -1,0 +1,212 @@
+# uji_barang.idk — Uji otomatis Fase 2 (modul Gudang/Barang, PRD §3.1 & §5.1).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_barang.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+impor layanan.barang
+dari teks impor teks_berisi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    kembalikan db
+}
+
+fungsi data_baku(sku, nama) {
+    kembalikan {"sku": sku, "nama": nama, "harga_beli": 5000, "harga_jual": 7000, "stok": 10, "stok_minimum": 2}
+}
+
+fungsi uji_cari() {
+    variabel db = db_segar()
+    barang.tambah(db, data_baku("SKU100", "Kopi ABC"))
+    barang.tambah(db, data_baku("SKU200", "Teh Pucuk"))
+    pastikan panjang(barang.cari(db, "kop")) == 1, "cari 'kop' ketemu 1"
+    pastikan panjang(barang.cari(db, "SKU2")) == 1, "cari sku 'SKU2' ketemu 1"
+    pastikan panjang(barang.cari(db, "Pucuk")) == 1, "cari nama 'Pucuk' ketemu 1"
+    pastikan panjang(barang.cari(db, "zzz")) == 0, "cari 'zzz' ketemu 0"
+    variabel pesan = ""
+    coba {
+        barang.cari(db, "   ")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "kata kosong ditolak"
+    pastikan teks_berisi(pesan, "kosong"), "pesan kata kosong ramah"
+    db_tutup(db)
+}
+
+fungsi uji_detail() {
+    variabel db = db_segar()
+    variabel id = barang.tambah(db, data_baku("SKU300", "Gula 1kg"))
+    variabel b = barang.detail(db, id)
+    pastikan b["nama"] == "Gula 1kg", "detail membawa nama"
+    pastikan b["aktif"] == benar, "aktif terbaca boolean benar"
+    pastikan b["harga_beli"] == 5000, "harga beli utuh"
+    variabel pesan = ""
+    coba {
+        barang.detail(db, 9999)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "id tak ketemu ditolak GalatData"
+    pastikan teks_berisi(pesan, "tidak ketemu"), "pesan id ramah"
+    db_tutup(db)
+}
+
+fungsi uji_hapus() {
+    variabel db = db_segar()
+    variabel id = barang.tambah(db, data_baku("SKU400", "Beras 5kg"))
+    barang.hapus_permanen(db, id)
+    variabel pesan = ""
+    coba {
+        barang.detail(db, id)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "barang tanpa riwayat terhapus permanen"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM riwayat_stok WHERE barang_id = ?", [id])
+    pastikan r["jml"] == 0, "riwayat stok ikut terhapus"
+    variabel id2 = barang.tambah(db, data_baku("SKU500", "Minyak 2L"))
+    db_eksekusi(db, "INSERT INTO transaksi (kode, tanggal, subtotal, diskon, total, dibayar, kembalian, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ["T-001", "2026-01-01 10:00:00", 7000, 0, 7000, 7000, 0, "lunas"])
+    variabel tid = db_id_terakhir(db)
+    db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)", [tid, id2, "Minyak 2L", 7000, 5000, 1, 7000])
+    pesan = ""
+    coba {
+        barang.hapus_permanen(db, id2)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "hapus dengan riwayat transaksi ditolak"
+    pastikan teks_berisi(pesan, "riwayat transaksi"), "pesan riwayat jelas"
+    pastikan barang.detail(db, id2)["nama"] == "Minyak 2L", "barang tetap tersimpan"
+    db_tutup(db)
+}
+
+fungsi uji_nonaktifkan() {
+    variabel db = db_segar()
+    variabel a = barang.tambah(db, data_baku("SKU600", "Mie Instan"))
+    barang.nonaktifkan(db, a)
+    pastikan barang.detail(db, a)["aktif"] == salah, "nonaktif membuat aktif = salah"
+    variabel pesan = ""
+    coba {
+        barang.nonaktifkan(db, a)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "nonaktif dua kali ditolak"
+    pastikan teks_berisi(pesan, "sudah nonaktif"), "pesan dobel nonaktif ramah"
+    pesan = ""
+    coba {
+        barang.nonaktifkan(db, 9999)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "nonaktif id asal ditolak GalatData"
+    barang.tambah(db, data_baku("SKU700", "Susu UHT"))
+    variabel daftar = barang.daftar(db)
+    pastikan daftar[0]["sku"] == "SKU700", "barang aktif tampil lebih dulu"
+    pastikan daftar[panjang(daftar) - 1]["sku"] == "SKU600", "barang nonaktif di bawah"
+    db_tutup(db)
+}
+
+fungsi uji_tambah_sah() {
+    variabel db = db_segar()
+    variabel id = barang.tambah(db, data_baku("SKU800", "Kopi Sachet"))
+    pastikan id == 1, "id pertama harus 1"
+    variabel b = barang.detail(db, id)
+    pastikan b["sku"] == "SKU800", "sku tersimpan"
+    pastikan b["stok"] == 10, "stok awal tersimpan"
+    pastikan b["aktif"] == benar, "barang aktif saat dibuat"
+    variabel r = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ?", [id])
+    pastikan panjang(r) == 1, "riwayat stok awal tercatat"
+    pastikan r[0]["jenis"] == "masuk", "jenis riwayat awal 'masuk'"
+    pastikan r[0]["jumlah"] == 10, "jumlah = stok awal"
+    pastikan r[0]["stok_sebelum"] == 0, "stok sebelum 0"
+    pastikan r[0]["stok_sesudah"] == 10, "stok sesudah 10"
+    pastikan r[0]["keterangan"] == "Stok awal", "keterangan 'Stok awal'"
+    variabel id0 = barang.tambah(db, {"sku": "SKU801", "nama": "Barang Kosong", "harga_beli": 1000, "harga_jual": 2000, "stok": 0, "stok_minimum": 0})
+    variabel r0 = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM riwayat_stok WHERE barang_id = ?", [id0])
+    pastikan r0["jml"] == 0, "stok awal 0 tanpa riwayat"
+    db_tutup(db)
+}
+
+fungsi uji_ubah() {
+    variabel db = db_segar()
+    variabel id = barang.tambah(db, data_baku("SKU900", "Teh Celup"))
+    variabel id2 = barang.tambah(db, data_baku("SKU901", "Kopi Bubuk"))
+    barang.ubah(db, id, {"sku": "SKU900", "nama": "Teh Celup Premium", "harga_beli": 6000, "harga_jual": 9000, "stok": 15, "stok_minimum": 3})
+    variabel b = barang.detail(db, id)
+    pastikan b["nama"] == "Teh Celup Premium", "nama berubah"
+    pastikan b["harga_jual"] == 9000, "harga jual berubah"
+    pastikan b["stok"] == 15, "stok berubah"
+    variabel r = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ? ORDER BY id", [id])
+    pastikan panjang(r) == 2, "riwayat awal + penyesuaian = 2"
+    pastikan r[1]["jenis"] == "penyesuaian", "jenis 'penyesuaian'"
+    pastikan r[1]["jumlah"] == 5, "selisih stok +5"
+    pastikan r[1]["stok_sebelum"] == 10, "stok sebelum 10"
+    pastikan r[1]["stok_sesudah"] == 15, "stok sesudah 15"
+    barang.ubah(db, id, {"sku": "SKU900", "nama": "Teh Celup Premium", "harga_beli": 6000, "harga_jual": 9100, "stok": 15, "stok_minimum": 3})
+    r = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ? ORDER BY id", [id])
+    pastikan panjang(r) == 2, "tanpa selisih stok tanpa riwayat baru"
+    variabel pesan = ""
+    coba {
+        barang.ubah(db, id2, {"sku": "SKU900", "nama": "Kopi Bubuk", "harga_beli": 5000, "harga_jual": 7000, "stok": 5, "stok_minimum": 1})
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "ubah ke SKU milik id lain ditolak"
+    pesan = ""
+    coba {
+        barang.ubah(db, 9999, data_baku("SKU999", "Hantu"))
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "ubah id tak ketemu ditolak GalatData"
+    db_tutup(db)
+}
+
+fungsi uji_validasi_angka() {
+    variabel db = db_segar()
+    variabel daftar_kasus = [
+        ["nama kosong", {"sku": "SKU10", "nama": "", "harga_beli": 0, "harga_jual": 1, "stok": 0, "stok_minimum": 0}, "Nama barangnya"],
+        ["harga beli minus", {"sku": "SKU10", "nama": "Barang", "harga_beli": -1, "harga_jual": 1, "stok": 0, "stok_minimum": 0}, "Harga beli"],
+        ["harga jual nol", {"sku": "SKU10", "nama": "Barang", "harga_beli": 0, "harga_jual": 0, "stok": 0, "stok_minimum": 0}, "Harga jual"],
+        ["stok minus", {"sku": "SKU10", "nama": "Barang", "harga_beli": 0, "harga_jual": 1, "stok": -1, "stok_minimum": 0}, "Stok tidak boleh"],
+        ["stok minimum minus", {"sku": "SKU10", "nama": "Barang", "harga_beli": 0, "harga_jual": 1, "stok": 0, "stok_minimum": -1}, "Stok minimum"]
+    ]
+    untuk k dalam daftar_kasus {
+        variabel pesan = ""
+        coba {
+            barang.tambah(db, k[1])
+        } kecuali GalatValidasi sebagai e {
+            pesan = e.pesan
+        }
+        pastikan panjang(pesan) > 0, "kasus '" + k[0] + "' harus ditolak"
+        pastikan teks_berisi(pesan, k[2]), "pesan kasus '" + k[0] + "' sesuai spesifikasi"
+    }
+    db_tutup(db)
+}
+
+fungsi uji_validasi_sku() {
+    variabel db = db_segar()
+    variabel pesan = ""
+    coba {
+        barang.tambah(db, data_baku("", "Tanpa SKU"))
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "SKU kosong ditolak"
+    pastikan teks_berisi(pesan, "SKU-nya belum diisi"), "pesan SKU kosong persis"
+    barang.tambah(db, data_baku("SKU11", "Barang Pertama"))
+    pesan = ""
+    coba {
+        barang.tambah(db, data_baku("SKU11", "Barang Kembar"))
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "SKU kembar ditolak"
+    pastikan teks_berisi(pesan, "sudah dipakai barang lain"), "pesan SKU kembar persis"
+    pastikan panjang(db_ambil_semua(db, "SELECT id FROM barang")) == 1, "SKU kembar tidak tersimpan"
+    db_tutup(db)
+}

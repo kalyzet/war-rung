@@ -1,0 +1,28 @@
+# inti/format.idk — Pembungkus format angka (DESIGN §7.6: format() tanpa gaya).
+# rupiah(4000) -> "4.000" (titik sebagai pemisah ribuan, gaya Indonesia).
+
+fungsi rupiah(n) {
+    variabel t = ke_teks(ke_bulat(n))
+    variabel hasil = ""
+    variabel kelompok = ""
+    untuk i dalam rentang(panjang(t)) {
+        variabel idx = panjang(t) - 1 - i
+        kelompok = potong(t, idx, 1) + kelompok
+        jika panjang(kelompok) == 3 {
+            jika panjang(hasil) > 0 {
+                hasil = kelompok + "." + hasil
+            } selain {
+                hasil = kelompok
+            }
+            kelompok = ""
+        }
+    }
+    jika panjang(kelompok) > 0 {
+        jika panjang(hasil) > 0 {
+            hasil = kelompok + "." + hasil
+        } selain {
+            hasil = kelompok
+        }
+    }
+    kembalikan hasil
+}

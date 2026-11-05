@@ -1,0 +1,78 @@
+# PoC 5 - Berkas: biner round-trip, direktori, galat I/O, buka_berkas.
+# Berkas biner uji dibuat shell: data/uji_biner.bin (256 byte 0..255).
+
+cetak("== 1. salin biner round-trip ==")
+variabel sumber = "data/uji_biner.bin"
+variabel salinan = "data/uji_biner_salinan.bin"
+pastikan ada_berkas(sumber), "data/uji_biner.bin harus dibuat shell sebelum PoC"
+
+variabel isi = baca_semua(sumber)
+cetak("panjang karakter:", panjang(isi))
+coba {
+    cetak("panjang byte:", panjang_byte(isi))
+} kecuali e {
+    cetak("panjang_byte TIDAK ADA:", e.pesan, "(bandingkan ukuran berkas via shell)")
+}
+tulis_semua(salinan, isi)
+pastikan ada_berkas(salinan), "salinan harus terbentuk"
+
+cetak("== 2. hash sha256 di dalam bahasa ==")
+variabel h_sumber = sha256(baca_semua(sumber))
+variabel h_salinan = sha256(baca_semua(salinan))
+cetak("sha256 isi sumber:", h_sumber)
+cetak("sha256 isi salinan:", h_salinan)
+pastikan h_sumber == h_salinan, "hash isi sumber harus sama dengan salinan"
+cetak("catatan: cocokkan dengan Get-FileHash shell untuk bukti byte-utuh")
+
+cetak("== 3. direktori & berkas ==")
+variabel d = "data/uji_direktori"
+coba { hapus_berkas(salinan) } kecuali e { cetak("bersih-bersih awal:", e.pesan) }
+buat_direktori(d)
+tulis_semua(d + "/b.txt", "isi b")
+tulis_semua(d + "/a.txt", "isi a")
+cetak("isi (terurut):", isi_direktori(d))
+cetak("direktori_kini:", direktori_kini())
+
+variabel f = buka_berkas(d + "/log.txt", "t")
+variabel n1 = tulis(f, "satu\n")
+variabel n2 = tulis(f, "dua\n")
+tutup(f)
+cetak("tulis byte:", n1, n2)
+
+variabel f2 = buka_berkas(d + "/log.txt", "b")
+cetak("baris1:", repr(baca_baris(f2)))
+cetak("baris2:", repr(baca_baris(f2)))
+cetak("EOF:", repr(baca_baris(f2)))
+tutup(f2)
+
+tambah_berkas(d + "/tambahan.txt", "baris 1\n")
+tambah_berkas(d + "/tambahan.txt", "baris 2\n")
+cetak("tambahan.txt:", repr(baca_semua(d + "/tambahan.txt")))
+
+cetak("== 4. galat I/O tertangkap ==")
+coba {
+    baca_semua("data/berkas_tidak_ada.txt")
+} kecuali e {
+    cetak("baca hilang:", e.pesan)
+}
+coba {
+    buat_direktori(d)
+} kecuali e {
+    cetak("buat_direktori ganda:", e.pesan)
+}
+coba {
+    hapus_direktori(d)
+} kecuali e {
+    cetak("hapus_direktori tak kosong:", e.pesan)
+}
+
+cetak("== 5. hapus berkas & direktori ==")
+hapus_berkas(d + "/a.txt")
+cetak("sesudah hapus a.txt:", isi_direktori(d))
+untuk nama dalam isi_direktori(d) {
+    hapus_berkas(d + "/" + nama)
+}
+hapus_direktori(d)
+cetak("terhapus:", ada_berkas(d) == salah)
+
+cetak("SELESAI-POC-5")

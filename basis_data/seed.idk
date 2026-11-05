@@ -1,0 +1,23 @@
+# basis_data/seed.idk — Isi awal bila database masih kosong.
+# Idempoten: baris hanya ditambahkan saat tabel pengaturan benar-benar kosong.
+
+fungsi jika_kosong(db) {
+    variabel ada = db_ambil_semua(db, "SELECT kunci FROM pengaturan LIMIT 1")
+    jika panjang(ada) > 0 {
+        kembalikan 0
+    }
+    variabel waktu = format_tanggal("%Y-%m-%d %H:%M:%S")
+    db_mulai(db)
+    coba {
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", ["nama_warung", "Warung Barokah"])
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", ["alamat_warung", "Jl. Raya No. 1"])
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", ["telepon_warung", ""])
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", ["catatan_struk", "Terima kasih sudah belanja, ya!"])
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", ["dibuat_pada", waktu])
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        db_batal(db)
+        naikkan e
+    }
+    kembalikan 1
+}

@@ -1,0 +1,75 @@
+# PoC 7 - Tampilan: ANSI, padding tabel, keterbatasan panjang() pada teks
+# berwarna, spinner dengan chr(13).
+# Temuan kunci: panjang() menghitung karakter ESC, jadi warna WAJIB dipasang
+# setelah layout dihitung dari teks polos.
+
+variabel ESC = chr(27)
+variabel RESET = ESC + "[0m"
+
+cetak("== 1. panjang() menghitung karakter ANSI ==")
+variabel berwarna = ESC + "[31m" + "ABC" + RESET
+cetak("panjang teks polos:", panjang("ABC"))
+cetak("panjang teks berwarna:", panjang(berwarna))
+pastikan panjang("ABC") == 3, "teks polos harus 3"
+pastikan panjang(berwarna) > 3, "karakter ANSI ikut terhitung"
+
+cetak("== 2. tabel dengan padding dari teks polos ==")
+fungsi kolom_kiri(teks, lebar) {
+    variabel k = ke_teks(teks)
+    selagi panjang(k) < lebar {
+        k = k + " "
+    }
+    jika panjang(k) > lebar {
+        kembalikan potong(k, 0, lebar)
+    }
+    kembalikan k
+}
+
+fungsi kolom_kanan(teks, lebar) {
+    variabel k = ke_teks(teks)
+    selagi panjang(k) < lebar {
+        k = " " + k
+    }
+    jika panjang(k) > lebar {
+        kembalikan potong(k, panjang(k) - lebar, lebar)
+    }
+    kembalikan k
+}
+
+fungsi baris_tabel(a, b, c) {
+    cetak("| " + kolom_kiri(a, 8) + " | " + kolom_kiri(b, 12) + " | " + kolom_kanan(c, 12) + " |")
+}
+
+baris_tabel("KODE", "NAMA", "HARGA")
+baris_tabel("-", "-", "-")
+baris_tabel("A1", "Indomie Goreng", "Rp2.500")
+baris_tabel("B2", "Aqua 600ml", "Rp3.000")
+baris_tabel("C3", "Kopi Kapal Api", "Rp1.500")
+
+pastikan panjang(kolom_kiri("A", 8)) == 8, "kolom kiri harus pas 8"
+pastikan panjang(kolom_kanan("Rp2.500", 12)) == 12, "kolom kanan harus pas 12"
+pastikan kolom_kanan("Rp2.500", 12) == "     Rp2.500", "padding kanan rata kanan"
+
+cetak("== 3. potong melewati ujung ==")
+coba {
+    cetak("potong('abc',0,99) =", repr(potong("abc", 0, 99)))
+} kecuali e {
+    cetak("potong galat:", e.pesan)
+}
+
+cetak("== 4. spinner (lihat visual) ==")
+variabel bingkai = ["|", "/", "-", "\\"]
+untuk i dalam rentang(12) {
+    cetak(chr(13) + bingkai[i % 4] + " memproses laporan", akhir="")
+    henti(0.07)
+}
+cetak("")
+
+cetak("== 5. pesan huruf besar/kecil & ganti ==")
+cetak(huruf_besar("indomie goreng"))
+cetak(ganti("Rp2.500,00", ",", "."))
+
+cetak("== 6. sequences clear-screen (direpr, tidak dieksekusi supaya output tetap terbaca) ==")
+cetak(repr(ESC + "[2J" + ESC + "[H"))
+
+cetak("SELESAI-POC-7")

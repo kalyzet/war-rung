@@ -1,0 +1,43 @@
+# inti/koneksi.idk — Satu-satunya tempat memanggil db_buka/db_tutup.
+# Lapisan lain meminta koneksi lewat fungsi di sini; SQL selalu memakai ?.
+
+impor konfigurasi
+dari teks impor teks_pisah, teks_pangkas
+
+fungsi buka_db() {
+    coba {
+        isi_direktori("data")
+    } kecuali Galat {
+        buat_direktori("data")
+    }
+    variabel db = db_buka(konfigurasi.PATH_DB)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi skema_terpasang(db) {
+    variabel baris = db_ambil_semua(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'barang'")
+    kembalikan panjang(baris) > 0
+}
+
+# DDL di skema.sql dijalankan pernyataan demi pernyataan:
+# db_eksekusi menolak dua pernyataan dalam satu panggilan (POC-HASIL §2.7).
+fungsi siapkan_skema(db) {
+    jika skema_terpasang(db) {
+        kembalikan 0
+    }
+    variabel sql = baca_semua(konfigurasi.PATH_SKEMA)
+    sql = ganti(sql, "\r\n", "\n")
+    untuk pernyataan dalam teks_pisah(sql, ";") {
+        variabel bersih = teks_pangkas(pernyataan)
+        jika panjang(bersih) == 0 {
+            lanjut
+        }
+        db_eksekusi(db, bersih)
+    }
+    kembalikan 1
+}
+
+fungsi tutup_db(db) {
+    db_tutup(db)
+}

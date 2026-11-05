@@ -1,0 +1,154 @@
+# layanan/barang.idk — Aturan bisnis barang + pesan ramah (PRD §5.1, DESIGN §6).
+
+impor repositori.barang
+dari model.barang impor dari_baris, dari_baris_banyak
+dari teks impor teks_pangkas, teks_berisi
+dari inti.galat impor GalatValidasi, GalatData
+
+fungsi pesan_db(e, aksi) {
+    variabel pesan = e.pesan
+    jika teks_berisi(pesan, "UNIQUE") atau teks_berisi(pesan, "unique") {
+        kembalikan "SKU itu baru saja dipakai barang lain, Bos."
+    }
+    kembalikan "Gagal " + aksi + ". Basis datanya lagi sibuk, coba lagi ya, Bos."
+}
+
+fungsi periksa_data(data) {
+    jika panjang(data["sku"]) == 0 {
+        naikkan GalatValidasi("SKU-nya belum diisi, Bos.")
+    }
+    jika panjang(data["nama"]) == 0 {
+        naikkan GalatValidasi("Nama barangnya jangan kosong ya, Bos.")
+    }
+    jika data["harga_beli"] < 0 {
+        naikkan GalatValidasi("Harga beli tidak boleh minus, Bos.")
+    }
+    jika data["harga_jual"] <= 0 {
+        naikkan GalatValidasi("Harga jual harus lebih dari nol, Bos.")
+    }
+    jika data["stok"] < 0 {
+        naikkan GalatValidasi("Stok tidak boleh minus, Bos.")
+    }
+    jika data["stok_minimum"] < 0 {
+        naikkan GalatValidasi("Stok minimum tidak boleh minus, Bos.")
+    }
+}
+
+fungsi tambah(db, data) {
+    periksa_data(data)
+    variabel kembar = barang.berdasarkan_sku(db, data["sku"])
+    jika kembar != kosong {
+        naikkan GalatValidasi("SKU '" + data["sku"] + "' sudah dipakai barang lain, Bos.")
+    }
+    variabel baris = {
+        "sku": data["sku"],
+        "nama": data["nama"],
+        "harga_beli": data["harga_beli"],
+        "harga_jual": data["harga_jual"],
+        "stok": data["stok"],
+        "stok_minimum": data["stok_minimum"],
+        "aktif": 1
+    }
+    coba {
+        db_mulai(db)
+        variabel id = barang.tambah(db, baris)
+        jika data["stok"] > 0 {
+            barang.catat_stok(db, id, "masuk", data["stok"], 0, data["stok"], "Stok awal")
+        }
+        db_komit(db)
+        kembalikan id
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(pesan_db(e, "menyimpan barang baru"))
+    }
+}
+
+fungsi ubah(db, id, data) {
+    periksa_data(data)
+    variabel lama = barang.berdasarkan_id(db, id)
+    jika lama == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    variabel kembar = barang.berdasarkan_sku(db, data["sku"])
+    jika kembar != kosong dan kembar["id"] != id {
+        naikkan GalatValidasi("SKU '" + data["sku"] + "' sudah dipakai barang lain, Bos.")
+    }
+    coba {
+        db_mulai(db)
+        barang.ubah(db, id, {
+            "sku": data["sku"],
+            "nama": data["nama"],
+            "harga_beli": data["harga_beli"],
+            "harga_jual": data["harga_jual"],
+            "stok": data["stok"],
+            "stok_minimum": data["stok_minimum"],
+            "aktif": lama["aktif"]
+        })
+        jika data["stok"] != lama["stok"] {
+            barang.catat_stok(db, id, "penyesuaian", data["stok"] - lama["stok"], lama["stok"], data["stok"], "Penyesuaian manual")
+        }
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(pesan_db(e, "menyimpan perubahan barang"))
+    }
+}
+
+fungsi nonaktifkan(db, id) {
+    variabel lama = barang.berdasarkan_id(db, id)
+    jika lama == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    jika lama["aktif"] == 0 {
+        naikkan GalatValidasi("'" + lama["nama"] + "' memang sudah nonaktif, Bos.")
+    }
+    barang.nonaktifkan(db, id)
+}
+
+fungsi hapus_permanen(db, id) {
+    variabel lama = barang.berdasarkan_id(db, id)
+    jika lama == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    jika barang.ada_riwayat_transaksi(db, id) {
+        naikkan GalatValidasi("'" + lama["nama"] + "' sudah punya riwayat transaksi. Nonaktifkan saja ya, Bos.")
+    }
+    coba {
+        db_mulai(db)
+        barang.hapus_riwayat_stok(db, id)
+        barang.hapus(db, id)
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(pesan_db(e, "menghapus barang"))
+    }
+}
+
+fungsi daftar(db) {
+    kembalikan dari_baris_banyak(barang.daftar_semua(db))
+}
+
+fungsi cari(db, kata) {
+    variabel k = teks_pangkas(kata)
+    jika panjang(k) == 0 {
+        naikkan GalatValidasi("Kata kuncinya kosong, Bos. Ketik nama atau SKU dulu.")
+    }
+    kembalikan dari_baris_banyak(barang.cari(db, k))
+}
+
+fungsi detail(db, id) {
+    variabel baris = barang.berdasarkan_id(db, id)
+    jika baris == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    kembalikan dari_baris(baris)
+}

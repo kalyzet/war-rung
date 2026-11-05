@@ -1,0 +1,74 @@
+# uji_fondasi.idk — Uji otomatis Fase 1.
+# `indk uji` menjalankan fungsi tingkat atas bernama uji_* (urut abjad).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_fondasi.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.kalender impor hari_dari_civil, civil_dari_hari, hari_dalam_minggu, awal_minggu, z_hari_ini, teks_civil
+impor konfigurasi
+impor inti.koneksi
+impor basis_data.seed
+
+fungsi uji_galat_domain() {
+    coba {
+        naikkan GalatValidasi("sku wajib diisi")
+    } kecuali GalatValidasi sebagai e {
+        pastikan e.pesan == "sku wajib diisi", "pesan GalatValidasi harus utuh"
+    }
+    pastikan turunan_dari(GalatValidasi, Galat), "GalatValidasi turunan Galat"
+    pastikan turunan_dari(GalatData, Galat), "GalatData turunan Galat"
+}
+
+fungsi uji_kalender() {
+    pastikan hari_dari_civil(1970, 1, 1) == 0, "epoch 1970-01-01 harus 0"
+    pastikan civil_dari_hari(0)[0] == 1970, "balik epoch harus 1970"
+    pastikan hari_dalam_minggu(hari_dari_civil(2026, 11, 4)) == 2, "2026-11-04 harus Rabu"
+    untuk contoh dalam [[2024, 2, 29], [2100, 3, 1], [1999, 12, 31], [1600, 2, 29]] {
+        variabel z = hari_dari_civil(contoh[0], contoh[1], contoh[2])
+        variabel balik = civil_dari_hari(z)
+        pastikan balik[0] == contoh[0] dan balik[1] == contoh[1] dan balik[2] == contoh[2], "round-trip gagal " + teks_civil(z)
+    }
+    variabel z0 = z_hari_ini()
+    pastikan awal_minggu(z0) <= z0, "awal minggu tidak melewati hari ini"
+    pastikan z0 - awal_minggu(z0) <= 6, "jarak ke awal minggu maksimal 6 hari"
+    pastikan hari_dalam_minggu(awal_minggu(z0)) == 0, "awal_minggu harus Senin"
+}
+
+fungsi uji_koneksi_skema() {
+    variabel db = koneksi.buka_db()
+    variabel s_skema = koneksi.siapkan_skema(db)
+    pastikan s_skema == 0 atau s_skema == 1, "siapkan_skema hasil 0 atau 1"
+    pastikan koneksi.siapkan_skema(db) == 0, "skema kedua kali tidak dijalankan lagi"
+    pastikan koneksi.skema_terpasang(db) == benar, "skema harus terpasang"
+    variabel fk = db_ambil_satu(db, "PRAGMA foreign_keys")
+    pastikan fk["foreign_keys"] == 1, "PRAGMA foreign_keys = ON"
+    variabel n_tabel = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('barang', 'pelanggan', 'transaksi', 'detail_transaksi', 'pembayaran_bon', 'riwayat_stok', 'pengaturan')")
+    pastikan n_tabel["n"] == 7, "harus ada tepat 7 tabel inti"
+    coba {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (1, 1, 'x', 100, 50, 1, 100)")
+        pastikan salah, "FK harus menolak transaksi_id yang tidak ada"
+    } kecuali GalatNilai {
+        # FK aktif menolak baris yatim — memang diharapkan
+    }
+    koneksi.tutup_db(db)
+}
+
+fungsi uji_konfigurasi() {
+    pastikan konfigurasi.NAMA_APLIKASI == "War-Rung", "nama aplikasi dari konfigurasi"
+    pastikan konfigurasi.PATH_DB == "data/War-Rung.db", "path DB sesuai PRD"
+    pastikan konfigurasi.PATH_SKEMA == "basis_data/skema.sql", "path skema sesuai PRD"
+}
+
+fungsi uji_seed_idempoten() {
+    variabel db = koneksi.buka_db()
+    koneksi.siapkan_skema(db)
+    variabel s = seed.jika_kosong(db)
+    pastikan s == 0 atau s == 1, "hasil seed 0 atau 1"
+    variabel n_sebelum = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM pengaturan")
+    variabel s_lagi = seed.jika_kosong(db)
+    pastikan s_lagi == 0, "seed kedua kali selalu 0"
+    variabel n_sesudah = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM pengaturan")
+    pastikan n_sesudah["n"] == n_sebelum["n"], "seed tidak boleh menambah baris saat sudah terisi"
+    pastikan n_sebelum["n"] >= 4, "minimal 4 kunci pengaturan awal"
+    koneksi.tutup_db(db)
+}

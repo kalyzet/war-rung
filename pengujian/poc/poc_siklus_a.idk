@@ -1,0 +1,4 @@
+# Modul siklus A - mengimpor B, yang mengimpor balik A.
+impor poc_siklus_b
+variabel penanda = "a"
+cetak("siklus_a dimuat")

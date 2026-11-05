@@ -1,0 +1,87 @@
+# inti/kalender.idk — Aritmetika tanggal: hari epoch <-> kalender sipil.
+# Dilift utuh dari PoC 6 (poc_tanggal.idk, semua pastikan lulus).
+# Modul sengaja TIDAK dinamai "tanggal" supaya tidak menimpa builtin tanggal().
+
+fungsi hari_dari_civil(t, b, h) {
+    t = ke_bulat(t)
+    b = ke_bulat(b)
+    h = ke_bulat(h)
+    variabel y = t
+    jika b <= 2 {
+        y = y - 1
+    }
+    variabel era = (y jika y >= 0 selain y - 399) // 400
+    variabel yoe = y - era * 400
+    variabel doy = (153 * (b + (-3 jika b > 2 selain 9)) + 2) // 5 + h - 1
+    variabel doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    kembalikan era * 146097 + doe - 719468
+}
+
+fungsi civil_dari_hari(z) {
+    z = ke_bulat(z)
+    variabel zz = z + 719468
+    variabel era = (zz jika zz >= 0 selain zz - 146096) // 146097
+    variabel doe = zz - era * 146097
+    variabel yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+    variabel y = yoe + era * 400
+    variabel doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+    variabel mp = (5 * doy + 2) // 153
+    variabel h = doy - (153 * mp + 2) // 5 + 1
+    variabel b = mp + (3 jika mp < 10 selain -9)
+    jika b <= 2 {
+        y = y + 1
+    }
+    kembalikan [y, b, h]
+}
+
+fungsi teks_civil(z) {
+    variabel c = civil_dari_hari(z)
+    variabel teks_bulan = ke_teks(c[1])
+    variabel teks_hari = ke_teks(c[2])
+    jika panjang(teks_bulan) < 2 {
+        teks_bulan = "0" + teks_bulan
+    }
+    jika panjang(teks_hari) < 2 {
+        teks_hari = "0" + teks_hari
+    }
+    kembalikan ke_teks(c[0]) + "-" + teks_bulan + "-" + teks_hari
+}
+
+# 0 = Senin ... 6 = Minggu (konsisten strftime %u - 1)
+fungsi hari_dalam_minggu(z) {
+    kembalikan (z + 3) % 7
+}
+
+fungsi awal_minggu(z) {
+    kembalikan z - hari_dalam_minggu(z)
+}
+
+fungsi awal_bulan(t, b) {
+    kembalikan hari_dari_civil(t, b, 1)
+}
+
+fungsi bulan_berikut(t, b) {
+    jika b == 12 {
+        kembalikan [t + 1, 1]
+    }
+    kembalikan [t, b + 1]
+}
+
+fungsi z_hari_ini() {
+    variabel t = tanggal()
+    kembalikan hari_dari_civil(t["tahun"], t["bulan"], t["hari"])
+}
+
+fungsi z_awal_bulan_ini() {
+    variabel t = tanggal()
+    kembalikan awal_bulan(t["tahun"], t["bulan"])
+}
+
+# Format timestamp standar basis data (PRD keputusan 8).
+fungsi teks_db() {
+    kembalikan format_tanggal("%Y-%m-%d %H:%M:%S")
+}
+
+fungsi teks_pendek() {
+    kembalikan format_tanggal("%Y-%m-%d")
+}

@@ -1,0 +1,5 @@
+e7c55a7a56769906c81db6dff3cf8675348b6ca5c4bdadb6fbc47150f7be1184  Indonesiaku-Setup-1.4.0.exe
+1ca8d59f39f29774fb609a251a4498b62eb000f62ac8d7a4b23f2b9ca8263575  indk-linux.tar.gz
+f389d39d4a4113f6fcfef5548f6a2ed4e686972bf5e5c2e48cfc68f3dae9cbe1  indk-macos.tar.gz
+254fd67e7f39f8279c7271b6fc36302790a68b6c0ff30b9432d6e5d5939bde27  indk-windows.zip
+c9daec00d03ed86bf6f031b1ed0c1263b5008cf95d6a1f3f58cfc5c79618a508  indonesiaku_1.4.0_amd64.deb

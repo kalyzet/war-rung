@@ -1,0 +1,93 @@
+# PoC 1 - Prasyarat runtime: cetak, escape ANSI, f-string, format,
+# konversi, galat runtime, henti, argumen, input stdin.
+# Lulus: exit 0 dan baris "SELESAI-POC-1" tercetak.
+
+variabel ESC = chr(27)
+variabel RESET = ESC + "[0m"
+variabel MERAH = ESC + "[31m"
+variabel HIJAU = ESC + "[32m"
+
+cetak("== 1. cetak: akhir dan pisah ==")
+cetak("progress 10%", akhir="")
+cetak(" <- akhir kosong", pisah="")
+cetak("a", "b", pisah=" | ")
+
+cetak("== 2. ANSI dasar (berwarna bila terminal mendukung) ==")
+cetak(MERAH + "merah" + RESET, HIJAU + "hijau" + RESET)
+
+cetak("== 3. f-string ==")
+variabel nama = "Warung Barokah"
+variabel sisa = 5
+cetak(f"toko {nama}: sisa stok {sisa}")
+
+cetak("== 4. format ==")
+coba {
+    cetak("format dasar:", format("{} dan {}", "a", "b"))
+} kecuali e {
+    cetak("format dasar GAGAL:", e.pesan)
+}
+coba {
+    cetak("format lanjutan:", format("{:02d}", 7))
+} kecuali e {
+    cetak("format lanjutan TIDAK didukung:", e.pesan)
+}
+
+cetak("== 5. panjang vs panjang_byte ==")
+cetak("panjang('héllo') =", panjang("héllo"))
+pastikan panjang("héllo") == 5, "panjang harus 5 karakter"
+coba {
+    cetak("panjang_byte =", panjang_byte("héllo"))
+} kecuali e {
+    cetak("panjang_byte TIDAK ADA di runtime ini:", e.pesan)
+}
+
+cetak("== 6. konversi & jenis ==")
+cetak(repr(ke_teks(150000)), repr(ke_teks(5.0)))
+cetak(jenis(1), jenis(1.5), jenis("x"), jenis(kosong), jenis([1]), jenis({"a": 1}))
+cetak(ke_bulat("12"), ke_desimal("12"), ke_logika(0), ke_logika("x"))
+
+cetak("== 7. galat runtime dapat ditangkap? ==")
+coba {
+    cetak(tidak_ada_variabel)
+} kecuali e {
+    cetak("baca nama tak dikenal: tertangkap generik:", e.pesan)
+    cetak("  termasuk GalatNama?", adalah_instansi(e, GalatNama), "| termasuk Galat?", adalah_instansi(e, Galat))
+}
+coba {
+    variabel angka = ke_angka("bukan-angka")
+    cetak("ke_angka tidak galat?!:", angka)
+} kecuali e {
+    cetak("ke_angka gagal: tertangkap generik:", e.pesan, "| GalatNilai?", adalah_instansi(e, GalatNilai))
+}
+coba {
+    ke_bulat("dua belas")
+} kecuali GalatNilai sebagai e {
+    cetak("ke_bulat GalatNilai tertangkap:", e.pesan)
+} kecuali e {
+    cetak("ke_bulat kelas lain:", e.pesan, "| GalatNilai?", adalah_instansi(e, GalatNilai))
+}
+
+cetak("== 8. henti & jam ==")
+variabel t0 = jam()
+henti(0.1)
+cetak("selisih jam ~0.1s:", bulatkan(jam() - t0, 2))
+
+cetak("== 9. argumen baris perintah ==")
+cetak("argumen:", argumen)
+
+cetak("== 10. input stdin (jalankan dengan pipe: '2') ==")
+variabel jawab = input("pilih menu: ")
+cetak("jawaban:", repr(jawab))
+pastikan jawab == "2", "input() harus membaca '2' dari stdin"
+
+cetak("SELESAI-POC-1")
+
+# Tes terakhir: indeks di luar jangkauan. Panduan bilang tidak dapat
+# ditangkap; SPESIFIKASI bilang semua galat runtime dapat. Dicetak
+# SELESAI-POC-1 dulu supaya hasil sebelumnya tetap terbaca bila abort.
+coba {
+    variabel d = [1]
+    cetak(d[5])
+} kecuali e {
+    cetak("indeks di luar jangkauan DAPAT ditangkap:", e.pesan)
+}

@@ -1,0 +1,4 @@
+# Modul siklus B - mengimpor balik A (diuji: tidak boleh loop).
+impor poc_siklus_a
+variabel penanda_b = "b"
+cetak("siklus_b dimuat")

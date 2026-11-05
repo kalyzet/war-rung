@@ -1,0 +1,125 @@
+# PoC 3 - SQLite: PRAGMA foreign_keys, pelanggaran constraint (kelas galat),
+# transaksi, jumlah ?, dua pernyataan, handle tertutup, db_baris_terpengaruh.
+
+fungsi laporkan(label, fn) {
+    coba {
+        fn()
+        cetak(label, "| hasil: TIDAK galat")
+    } kecuali GalatTipe sebagai e {
+        cetak(label, "| GalatTipe:", e.pesan)
+    } kecuali GalatNilai sebagai e {
+        cetak(label, "| GalatNilai:", e.pesan)
+    } kecuali GalatOS sebagai e {
+        cetak(label, "| GalatOS:", e.pesan)
+    } kecuali Galat sebagai e {
+        cetak(label, "| Galat lain:", e.pesan)
+    } kecuali e {
+        cetak(label, "| non-Galat:", repr(e))
+    }
+}
+
+cetak("== 0. probe kelas galat bawaan ==")
+coba { cetak("GalatOS:", GalatOS) } kecuali e { cetak("GalatOS: TIDAK ADA -", e.pesan) }
+coba { cetak("GalatAritmetika:", GalatAritmetika) } kecuali e { cetak("GalatAritmetika: TIDAK ADA -", e.pesan) }
+coba { cetak("GalatPencarian:", GalatPencarian) } kecuali e { cetak("GalatPencarian: TIDAK ADA -", e.pesan) }
+coba { cetak("GalatIndeks:", GalatIndeks) } kecuali e { cetak("GalatIndeks: TIDAK ADA -", e.pesan) }
+coba { cetak("GalatKunci:", GalatKunci) } kecuali e { cetak("GalatKunci: TIDAK ADA -", e.pesan) }
+
+variabel db = db_buka(":memory:")
+
+cetak("== 1. PRAGMA foreign_keys via db_eksekusi ==")
+coba {
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    variabel pragma = db_ambil_satu(db, "PRAGMA foreign_keys")
+    cetak("baca PRAGMA:", pragma)
+} kecuali e {
+    cetak("PRAGMA gagal:", e.pesan)
+}
+
+cetak("== 2. tabel FK ==")
+db_eksekusi(db, "CREATE TABLE induk (id INTEGER PRIMARY KEY, nama TEXT)")
+db_eksekusi(db, "CREATE TABLE anak (id INTEGER PRIMARY KEY, induk_id INTEGER REFERENCES induk(id))")
+db_eksekusi(db, "INSERT INTO induk (nama) VALUES (?)", ["pusat"])
+cetak("id induk:", db_id_terakhir(db))
+
+fungsi uji_fk() {
+    db_eksekusi(db, "INSERT INTO anak (induk_id) VALUES (?)", [999])
+}
+laporkan("FK induk_id 999 (tidak ada)", uji_fk)
+cetak("baris anak:", db_ambil_satu(db, "SELECT COUNT(*) AS n FROM anak")["n"])
+
+cetak("== 3. UNIQUE / CHECK / NOT NULL ==")
+db_eksekusi(db, "CREATE TABLE kategori (id INTEGER PRIMARY KEY, nama TEXT UNIQUE)")
+db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["minuman"])
+fungsi uji_unik() {
+    db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["minuman"])
+}
+laporkan("UNIQUE ganda", uji_unik)
+
+db_eksekusi(db, "CREATE TABLE barang_uji (id INTEGER PRIMARY KEY, nama TEXT, harga INTEGER CHECK (harga >= 0))")
+fungsi uji_check() {
+    db_eksekusi(db, "INSERT INTO barang_uji (nama, harga) VALUES (?, ?)", ["rusak", -1])
+}
+laporkan("CHECK harga -1", uji_check)
+
+fungsi uji_notnull() {
+    db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", [kosong])
+}
+laporkan("NOT NULL nama NULL", uji_notnull)
+
+cetak("== 4. jumlah ? != params ==")
+fungsi uji_param_lebih() {
+    db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["a", "b"])
+}
+laporkan("params lebih banyak dari ?", uji_param_lebih)
+
+fungsi uji_param_kurang() {
+    db_eksekusi(db, "INSERT INTO kategori (nama, id) VALUES (?, ?)", ["c"])
+}
+laporkan("params lebih sedikit dari ?", uji_param_kurang)
+
+cetak("== 5. dua pernyataan dalam satu panggilan ==")
+fungsi uji_ganda() {
+    db_eksekusi(db, "INSERT INTO kategori (nama) VALUES ('x'); DROP TABLE kategori")
+}
+laporkan("dua pernyataan", uji_ganda)
+cetak("kategori masih ada:", db_ambil_satu(db, "SELECT COUNT(*) AS n FROM kategori")["n"])
+
+cetak("== 6. kolom tak dikenal ==")
+fungsi uji_kolom() {
+    db_eksekusi(db, "INSERT INTO kategori (kolom_ngawur) VALUES (1)")
+}
+laporkan("kolom tak dikenal", uji_kolom)
+
+cetak("== 7. transaksi ==")
+db_mulai(db)
+db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["makanan"])
+db_batal(db)
+cetak("sesudah batal:", db_ambil_satu(db, "SELECT COUNT(*) AS n FROM kategori")["n"])
+
+db_mulai(db)
+db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["rokok"])
+db_komit(db)
+cetak("sesudah komit:", db_ambil_satu(db, "SELECT COUNT(*) AS n FROM kategori")["n"])
+
+fungsi uji_komit_tanpa_mulai() { db_komit(db) }
+laporkan("komit tanpa mulai", uji_komit_tanpa_mulai)
+fungsi uji_batal_tanpa_mulai() { db_batal(db) }
+laporkan("batal tanpa transaksi", uji_batal_tanpa_mulai)
+
+cetak("== 8. db_baris_terpengaruh & db_id_terakhir ==")
+db_eksekusi(db, "UPDATE kategori SET nama = 'diganti' WHERE nama = ?", ["rokok"])
+cetak("ubah 1 baris ->", db_baris_terpengaruh(db))
+db_eksekusi(db, "UPDATE kategori SET nama = 'tidak-ada' WHERE nama = ?", ["tidak-ada"])
+cetak("ubah 0 baris ->", db_baris_terpengaruh(db))
+db_eksekusi(db, "INSERT INTO kategori (nama) VALUES (?)", ["baru"])
+cetak("id_terakhir ->", db_id_terakhir(db))
+
+cetak("== 9. handle ditutup ==")
+db_tutup(db)
+fungsi uji_tutup_ganda() { db_tutup(db) }
+laporkan("db_tutup ganda", uji_tutup_ganda)
+fungsi uji_pakai_tutup() { db_ambil_satu(db, "SELECT 1 AS n") }
+laporkan("pakai handle tertutup", uji_pakai_tutup)
+
+cetak("SELESAI-POC-3")

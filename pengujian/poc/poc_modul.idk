@@ -1,0 +1,60 @@
+# PoC 4 - Modul: impor, alias, dari..impor, namespace, bentuk lama, siklus.
+
+impor poc_bantuan
+cetak("== 1. impor biasa ==")
+cetak("konstanta:", poc_bantuan.konstanta, "| fungsi:", poc_bantuan.fungsi_bantuan(21))
+
+impor poc_bantuan sebagai bantu
+cetak("== 2. alias ==")
+cetak("alias == asal:", bantu.konstanta == poc_bantuan.konstanta)
+
+dari poc_bantuan impor fungsi_bantuan, halo
+cetak("== 3. dari..impor ==")
+cetak(fungsi_bantuan(4), halo("dunia"))
+
+dari poc_bantuan impor konstanta sebagai konst_alias
+cetak("konstanta lewat alias:", konst_alias)
+
+cetak("== 4. bentuk lama impor \"berkas.idk\" ==")
+coba {
+    impor "poc_bantuan.idk"
+    cetak("legacy relatif importer: OK, konstanta =", konstanta)
+} kecuali e {
+    cetak("legacy relatif importer GAGAL:", e.pesan)
+}
+coba {
+    impor "pengujian/poc/poc_bantuan.idk"
+    coba {
+        cetak("legacy relatif CWD: OK, konstanta =", konstanta)
+    } kecuali GalatNama sebagai e2 {
+        cetak("legacy relatif CWD: terimpor tapi namespace tidak bocor:", e2.pesan)
+    }
+} kecuali e {
+    cetak("legacy relatif CWD juga GAGAL:", e.pesan)
+}
+
+cetak("== 5. __nama__ ==")
+cetak("__nama__ =", __nama__)
+
+cetak("== 6. jenis modul ==")
+cetak(jenis(poc_bantuan))
+
+cetak("== 7. siklus impor (tidak boleh loop) ==")
+coba {
+    impor poc_siklus_a
+    coba {
+        cetak("siklus selesai: a =", poc_siklus_a.penanda, "| b =", poc_siklus_a.poc_siklus_b.penanda_b)
+    } kecuali e {
+        cetak("akses parsial:", e.pesan)
+    }
+} kecuali e {
+    cetak("impor siklus menaikkan:", e.pesan)
+}
+
+cetak("== 8. impor dua kali (harus cache, bukan ulang) ==")
+impor poc_bantuan
+cetak("masih utuh:", poc_bantuan.konstanta)
+
+pastikan fungsi_bantuan(2) == 4, "fungsi_bantuan bekerja"
+pastikan __nama__ == "__utama__", "berkas utama bernama __utama__"
+cetak("SELESAI-POC-4")

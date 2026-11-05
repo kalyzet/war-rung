@@ -1,0 +1,34 @@
+# PoC 8 - kerangka pengujian `indk uji berkas.idk`:
+# hanya fungsi uji_* yang dijalankan perintah uji.
+
+fungsi tambah(a, b) { kembalikan a + b }
+
+fungsi uji_tambah() {
+    pastikan tambah(2, 3) == 5
+    pastikan tambah(-1, 1) == 0
+    pastikan tambah(0, 0) == 0
+}
+
+fungsi uji_galat_tertangkap() {
+    coba {
+        naikkan "gagal disengaja"
+    } kecuali e {
+        pastikan e == "gagal disengaja", "nilai naikkan harus utuh"
+    }
+}
+
+fungsi uji_pesan_pastikan() {
+    coba {
+        pastikan salah, "pesan uji pastikan"
+    } kecuali Galat sebagai e {
+        pastikan e.pesan == "pesan uji pastikan", "pesan pastikan harus identik"
+    }
+}
+
+fungsi uji_tanggal_palsu() {
+    variabel daftar = [1, 2, 3]
+    pastikan panjang(daftar) == 3
+    pastikan jumlah(daftar) == 6
+}
+
+cetak("poc_uji: skrip utama berjalan; uji_* TIDAK dijalankan di sini")

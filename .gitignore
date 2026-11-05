@@ -1,0 +1,59 @@
+# Berkas Basis Data
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+# Berkas Biner
+*.bin
+data/*.bin
+
+# Berkas Cadangan
+cadangan/
+*.bak
+*.backup
+
+# Berkas Log
+*.log
+logs/
+
+# Berkas Sementara
+*.tmp
+*.temp
+~*
+
+# Berkas IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Alat & Dependensi (arsip yang telah diekstrak)
+.tools/indk/
+.tools/*.zip
+
+# Simpan Checksum untuk Verifikasi
+!.tools/SHA256SUMS.txt
+
+# Khusus untuk Sistem Operasi Tertentu
+Thumbs.db
+desktop.ini
+
+# Lingkungan & Konfigurasi (jika bersifat sensitif)
+# Hapus Tanda Komentar Jika Diperlukan:
+# konfigurasi.idk
+
+# Artefak Hasil Pembangunan (jika ada)
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Cakupan & Hasil Pengujian
+coverage/
+*.coverage
+test-results/

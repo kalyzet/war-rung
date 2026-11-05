@@ -1,0 +1,50 @@
+# repositori/barang.idk — Akses data tabel barang & riwayat_stok (PRD §7.3).
+# Semua kueri memakai parameter '?' — tanpa interpolasi string ke SQL.
+
+fungsi tambah(db, b) {
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum, aktif) VALUES (?, ?, ?, ?, ?, ?, ?)", [b["sku"], b["nama"], b["harga_beli"], b["harga_jual"], b["stok"], b["stok_minimum"], b["aktif"]])
+    kembalikan db_id_terakhir(db)
+}
+
+fungsi berdasarkan_id(db, id) {
+    kembalikan db_ambil_satu(db, "SELECT * FROM barang WHERE id = ?", [id])
+}
+
+fungsi berdasarkan_sku(db, sku) {
+    kembalikan db_ambil_satu(db, "SELECT * FROM barang WHERE sku = ?", [sku])
+}
+
+fungsi daftar_semua(db) {
+    kembalikan db_ambil_semua(db, "SELECT * FROM barang ORDER BY aktif DESC, nama ASC")
+}
+
+fungsi cari(db, kata) {
+    variabel pola = "%" + kata + "%"
+    kembalikan db_ambil_semua(db, "SELECT * FROM barang WHERE sku LIKE ? OR nama LIKE ? ORDER BY aktif DESC, nama ASC", [pola, pola])
+}
+
+fungsi ubah(db, id, b) {
+    db_eksekusi(db, "UPDATE barang SET sku = ?, nama = ?, harga_beli = ?, harga_jual = ?, stok = ?, stok_minimum = ?, aktif = ? WHERE id = ?", [b["sku"], b["nama"], b["harga_beli"], b["harga_jual"], b["stok"], b["stok_minimum"], b["aktif"], id])
+}
+
+fungsi nonaktifkan(db, id) {
+    db_eksekusi(db, "UPDATE barang SET aktif = 0 WHERE id = ?", [id])
+}
+
+fungsi hapus(db, id) {
+    db_eksekusi(db, "DELETE FROM barang WHERE id = ?", [id])
+}
+
+fungsi ada_riwayat_transaksi(db, id) {
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM detail_transaksi WHERE barang_id = ?", [id])
+    kembalikan r["jml"] > 0
+}
+
+fungsi hapus_riwayat_stok(db, id) {
+    db_eksekusi(db, "DELETE FROM riwayat_stok WHERE barang_id = ?", [id])
+}
+
+fungsi catat_stok(db, id, jenis, jumlah, sebelum, sesudah, keterangan) {
+    variabel tanggal = format_tanggal("%Y-%m-%d %H:%M:%S")
+    db_eksekusi(db, "INSERT INTO riwayat_stok (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, tanggal, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?)", [id, jenis, jumlah, sebelum, sesudah, tanggal, keterangan])
+}

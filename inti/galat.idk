@@ -1,0 +1,21 @@
+# inti/galat.idk — Galat domain aplikasi.
+# Subkelas galat wajib punya init(pesan) sendiri (POC-HASIL §2.4);
+# kelas galat bawaan runtime tidak punya init.
+
+kelas GalatAplikasi < Galat {
+    init(pesan) {
+        diri.pesan = pesan
+    }
+}
+
+kelas GalatValidasi < Galat {
+    init(pesan) {
+        diri.pesan = pesan
+    }
+}
+
+kelas GalatData < Galat {
+    init(pesan) {
+        diri.pesan = pesan
+    }
+}
