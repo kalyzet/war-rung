@@ -1,0 +1,11 @@
+# inti/pesan.idk — Terjemahan pesan galat database ke bahasa warung (DESIGN §6).
+
+dari teks impor teks_berisi
+
+fungsi terjemah_db(e, aksi) {
+    variabel pesan = e.pesan
+    jika teks_berisi(pesan, "UNIQUE") atau teks_berisi(pesan, "unique") {
+        kembalikan "Data kembar itu sudah terlanjur tersimpan di tempat lain, Bos."
+    }
+    kembalikan "Gagal " + aksi + ". Basis datanya lagi sibuk, coba lagi ya, Bos."
+}

@@ -1,0 +1,386 @@
+# tampilan/kasir.idk — Modul Kasir: Meja Transaksi (PRD §3.2, DESIGN §5.3).
+# Layout teks-polos dulu, warna dibungkus sesudahnya (DESIGN §7.3).
+
+impor tampilan.dasar
+impor layanan.kasir
+impor layanan.barang
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.format impor rupiah
+dari teks impor teks_ulang, teks_pangkas, teks_berisi
+
+fungsi sel_kiri(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kiri(t, lebar), warna_kode)
+}
+
+fungsi sel_kanan(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kanan(t, lebar), warna_kode)
+}
+
+fungsi baca_isian(petunjuk) {
+    variabel j = ""
+    coba {
+        j = input(petunjuk)
+    } kecuali Galat {
+        kembalikan kosong
+    }
+    jika j == kosong {
+        kembalikan kosong
+    }
+    kembalikan teks_pangkas(j)
+}
+
+fungsi baca_angka(petunjuk) {
+    variabel j = baca_isian(petunjuk)
+    jika j == kosong {
+        kembalikan kosong
+    }
+    jika j == "" {
+        kembalikan ""
+    }
+    jika teks_berisi(j, ".") atau teks_berisi(j, ",") {
+        naikkan GalatValidasi("Angka ditulis tanpa titik atau koma ya, Bos.")
+    }
+    variabel n = 0
+    coba {
+        n = ke_bulat(ke_angka(j))
+    } kecuali Galat {
+        naikkan GalatValidasi("Itu bukan angka, Bos.")
+    }
+    kembalikan n
+}
+
+fungsi konversi_id(teks) {
+    variabel n = 0
+    coba {
+        n = ke_bulat(ke_angka(teks))
+    } kecuali Galat {
+        naikkan GalatValidasi("Nomornya harus angka ya, Bos.")
+    }
+    kembalikan n
+}
+
+fungsi pilih_nomor(petunjuk, maks) {
+    variabel j = baca_isian(petunjuk)
+    jika j == kosong atau j == "" {
+        kembalikan 0
+    }
+    variabel n = konversi_id(j)
+    jika n < 0 atau n > maks {
+        naikkan GalatValidasi("Nomornya antara 0 dan " + ke_teks(maks) + ", Bos.")
+    }
+    kembalikan n
+}
+
+fungsi baca_jumlah(petunjuk) {
+    variabel j = baca_isian(petunjuk)
+    jika j == kosong {
+        kembalikan 0
+    }
+    jika j == "" {
+        kembalikan 1
+    }
+    jika teks_berisi(j, ".") atau teks_berisi(j, ",") {
+        naikkan GalatValidasi("Angka ditulis tanpa titik atau koma ya, Bos.")
+    }
+    variabel n = 0
+    coba {
+        n = ke_bulat(ke_angka(j))
+    } kecuali Galat {
+        naikkan GalatValidasi("Itu bukan angka, Bos.")
+    }
+    jika n < 1 {
+        naikkan GalatValidasi("Jumlah minimal 1, Bos. Untuk menghapus pakai [3].")
+    }
+    kembalikan n
+}
+
+fungsi rangkai_hasil(hasil) {
+    variabel h = "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("SKU", 10, dasar.REDUP) + " " + sel_kiri("Nama", 16, dasar.REDUP) + " " + sel_kanan("Harga", 9, dasar.REDUP) + " " + sel_kanan("Stok", 4, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 46) + dasar.RESET + "\n"
+    untuk i dalam rentang(panjang(hasil)) {
+        variabel b = hasil[i]
+        h = h + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(b["sku"], 10, dasar.TEKS) + " " + sel_kiri(b["nama"], 16, dasar.TEKS) + " " + sel_kanan(rupiah(b["harga_jual"]), 9, dasar.TEKS) + " " + sel_kanan(ke_teks(b["stok"]), 4, dasar.TEKS) + "\n"
+    }
+    kembalikan h
+}
+
+fungsi meja_tabel(keranjang, diskon) {
+    variabel b = "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("SKU", 10, dasar.REDUP) + " " + sel_kiri("Nama", 16, dasar.REDUP) + " " + sel_kanan("Qty", 3, dasar.REDUP) + " " + sel_kanan("Harga", 9, dasar.REDUP) + " " + sel_kanan("Sub", 10, dasar.REDUP) + "\n"
+    b = b + "  " + dasar.REDUP + teks_ulang("-", 55) + dasar.RESET + "\n"
+    variabel subtotal = 0
+    untuk i dalam rentang(panjang(keranjang)) {
+        variabel it = keranjang[i]
+        variabel sub = it["barang"]["harga_jual"] * it["jumlah"]
+        subtotal = subtotal + sub
+        b = b + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(it["barang"]["sku"], 10, dasar.TEKS) + " " + sel_kiri(it["barang"]["nama"], 16, dasar.TEKS) + " " + sel_kanan(ke_teks(it["jumlah"]), 3, dasar.NYALA) + " " + sel_kanan(rupiah(it["barang"]["harga_jual"]), 9, dasar.TEKS) + " " + sel_kanan(rupiah(sub), 10, dasar.TEKS) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "Subtotal : " + dasar.RESET + "Rp " + rupiah(subtotal) + "\n"
+    b = b + "  " + dasar.REDUP + "Diskon   : " + dasar.RESET + "Rp " + rupiah(diskon) + "\n"
+    variabel isi = "TOTAL : Rp " + rupiah(subtotal - diskon)
+    b = b + "  " + dasar.warna("┌" + teks_ulang("─", panjang(isi) + 2) + "┐▒", dasar.HIJAU) + "\n"
+    b = b + "  " + dasar.warna("│ " + isi + " │▒", dasar.HIJAU + dasar.TEBAL) + "\n"
+    b = b + "  " + dasar.warna("└" + teks_ulang("─", panjang(isi) + 2) + "┘▒", dasar.HIJAU) + "\n"
+    kembalikan b
+}
+
+fungsi menu_meja(pesan) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna("[1]", dasar.NYALA) + " " + dasar.TEKS + "Tambah barang (SKU/nama)" + dasar.RESET + "\n"
+    b = b + "  " + dasar.warna("[2]", dasar.NYALA) + " " + dasar.TEKS + "Ubah jumlah" + dasar.RESET + "\n"
+    b = b + "  " + dasar.warna("[3]", dasar.NYALA) + " " + dasar.TEKS + "Hapus dari keranjang" + dasar.RESET + "\n"
+    b = b + "  " + dasar.warna("[4]", dasar.NYALA) + " " + dasar.TEKS + "Atur diskon" + dasar.RESET + "\n"
+    b = b + "  " + dasar.warna("[5]", dasar.NYALA) + " " + dasar.TEKS + "Bayar tunai" + dasar.RESET + "\n"
+    b = b + "  " + dasar.warna("[6]", dasar.NYALA) + " " + dasar.TEKS + "Kosongkan keranjang" + dasar.RESET + "\n"
+    jika panjang(pesan) > 0 {
+        b = b + "\n  " + dasar.warna("! " + pesan, dasar.MERAH) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[1-6] Aksi | [Enter] Segarkan | [0] Kembali" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi rangkai_meja(keranjang, diskon, pesan) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna(dasar.kolom_kiri("MEJA TRANSAKSI", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n"
+    jika panjang(keranjang) == 0 {
+        b = b + "\n  " + dasar.warna("Keranjang masih kosong, Bos. Ketik [1] untuk mulai belanja.", dasar.REDUP) + "\n"
+    } selain {
+        b = b + meja_tabel(keranjang, diskon)
+    }
+    kembalikan b + menu_meja(pesan)
+}
+
+fungsi rangkai_struk(h) {
+    variabel b = "\n  " + dasar.warna(dasar.kolom_kiri("STRUK BELANJA", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Kode", 14) + dasar.RESET + ": " + h["kode"] + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Tanggal", 14) + dasar.RESET + ": " + h["tanggal"] + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Jumlah barang", 14) + dasar.RESET + ": " + ke_teks(h["jumlah_barang"]) + " item\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Subtotal", 14) + dasar.RESET + ": Rp " + rupiah(h["subtotal"]) + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Diskon", 14) + dasar.RESET + ": Rp " + rupiah(h["diskon"]) + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("TOTAL", 14) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(h["total"]), dasar.HIJAU + dasar.TEBAL) + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Tunai", 14) + dasar.RESET + ": Rp " + rupiah(h["tunai"]) + "\n"
+    b = b + "  " + dasar.REDUP + dasar.kolom_kiri("Kembalian", 14) + dasar.RESET + ": Rp " + rupiah(h["kembalian"]) + "\n"
+    b = b + "\n  " + dasar.divider(42) + "\n"
+    b = b + "  " + dasar.warna("Terima kasih, Bos!", dasar.HIJAU + dasar.TEBAL) + "\n\n"
+    kembalikan b
+}
+
+fungsi aksi_tambah(db, keranjang) {
+    variabel kata = baca_isian("  Ketik SKU/nama barang : ")
+    jika kata == kosong atau kata == "" {
+        kembalikan keranjang
+    }
+    variabel hasil = barang.cari(db, kata)
+    jika panjang(hasil) == 0 {
+        dasar.dialog("Barang '" + kata + "' tidak ketemu, Bos.")
+        kembalikan keranjang
+    }
+    variabel b = hasil[0]
+    jika panjang(hasil) > 1 {
+        dasar.bersihkan_layar()
+        cetak("\n  " + dasar.warna(dasar.kolom_kiri("HASIL CARI: " + kata, 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+        cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+        cetak(rangkai_hasil(hasil), akhir="")
+        variabel no = pilih_nomor("  Pilih nomor (0 = batal) : ", panjang(hasil))
+        jika no == 0 {
+            dasar.dialog("Dibatalkan, Bos.")
+            kembalikan keranjang
+        }
+        b = hasil[no - 1]
+    }
+    variabel q = baca_jumlah("  Jumlah (Enter = 1) : ")
+    jika q == 0 {
+        kembalikan keranjang
+    }
+    variabel idx = -1
+    untuk i dalam rentang(panjang(keranjang)) {
+        jika keranjang[i]["barang"]["id"] == b["id"] {
+            idx = i
+        }
+    }
+    variabel lama = 0
+    jika idx >= 0 {
+        lama = keranjang[idx]["jumlah"]
+    }
+    jika lama + q > b["stok"] {
+        naikkan GalatValidasi("Stok " + b["nama"] + " tinggal " + ke_teks(b["stok"]) + ", Bos.")
+    }
+    jika idx >= 0 {
+        keranjang[idx]["jumlah"] = lama + q
+        keranjang[idx]["barang"] = b
+    } selain {
+        tambah(keranjang, {"barang": b, "jumlah": q})
+    }
+    kembalikan keranjang
+}
+
+fungsi aksi_ubah(db, keranjang) {
+    jika panjang(keranjang) == 0 {
+        dasar.dialog("Keranjang masih kosong, Bos.")
+        kembalikan keranjang
+    }
+    variabel no = pilih_nomor("  Nomor barang (0 = batal) : ", panjang(keranjang))
+    jika no == 0 {
+        dasar.dialog("Dibatalkan, Bos.")
+        kembalikan keranjang
+    }
+    variabel it = keranjang[no - 1]
+    variabel q = baca_jumlah("  Jumlah baru (sekarang " + ke_teks(it["jumlah"]) + ") : ")
+    jika q == 0 {
+        kembalikan keranjang
+    }
+    variabel b = barang.detail(db, it["barang"]["id"])
+    jika q > b["stok"] {
+        naikkan GalatValidasi("Stok " + b["nama"] + " tinggal " + ke_teks(b["stok"]) + ", Bos.")
+    }
+    it["jumlah"] = q
+    it["barang"] = b
+    kembalikan keranjang
+}
+
+fungsi aksi_hapus(keranjang) {
+    jika panjang(keranjang) == 0 {
+        dasar.dialog("Keranjang sudah kosong, Bos.")
+        kembalikan keranjang
+    }
+    variabel no = pilih_nomor("  Nomor yang dihapus (0 = batal) : ", panjang(keranjang))
+    jika no == 0 {
+        dasar.dialog("Dibatalkan, Bos.")
+        kembalikan keranjang
+    }
+    variabel baru = []
+    untuk i dalam rentang(panjang(keranjang)) {
+        jika i != no - 1 {
+            tambah(baru, keranjang[i])
+        }
+    }
+    kembalikan baru
+}
+
+fungsi aksi_diskon(keranjang, diskon) {
+    jika panjang(keranjang) == 0 {
+        dasar.dialog("Keranjang masih kosong, Bos.")
+        kembalikan diskon
+    }
+    variabel subtotal = 0
+    untuk it dalam keranjang {
+        subtotal = subtotal + it["barang"]["harga_jual"] * it["jumlah"]
+    }
+    variabel j = baca_angka("  Diskon (Rp, Enter = 0) : ")
+    jika j == kosong {
+        kembalikan diskon
+    }
+    variabel d = j
+    jika d == "" {
+        d = 0
+    }
+    jika d < 0 {
+        naikkan GalatValidasi("Diskonnya tidak boleh minus, Bos.")
+    }
+    jika d > subtotal {
+        naikkan GalatValidasi("Diskonnya kebanyakan, Bos. Maksimal Rp " + rupiah(subtotal) + ".")
+    }
+    kembalikan d
+}
+
+fungsi aksi_kosong(keranjang) {
+    jika panjang(keranjang) == 0 {
+        dasar.dialog("Keranjang memang sudah kosong, Bos.")
+        kembalikan keranjang
+    }
+    variabel jwb = baca_isian("  Kosongkan seluruh keranjang? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        kembalikan keranjang
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan keranjang
+    }
+    kembalikan []
+}
+
+fungsi aksi_bayar(db, keranjang, diskon) {
+    variabel s = kasir.ringkasan(keranjang, diskon)
+    variabel tunai = baca_angka("  Uang tunai (Rp) : ")
+    jika tunai == kosong atau tunai == "" {
+        dasar.dialog("Pembayaran dibatalkan, Bos.")
+        kembalikan -1
+    }
+    jika tunai < s["total"] {
+        naikkan GalatValidasi("Uang tunai yang dibayar kurang dari total belanja, Bos.")
+    }
+    variabel jwb = baca_isian("  Simpan transaksi? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Tidak jadi disimpan, Bos.")
+        kembalikan -1
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan -1
+    }
+    variabel h = kasir.simpan(db, keranjang, diskon, tunai)
+    dasar.bersihkan_layar()
+    cetak(rangkai_struk(h), akhir="")
+    dasar.dialog("Terima kasih, Bos! Enter untuk lanjut.")
+    kembalikan 1
+}
+
+fungsi jalankan(db) {
+    variabel keranjang = []
+    variabel diskon = 0
+    variabel berjalan = benar
+    variabel pesan = ""
+    selagi berjalan {
+        dasar.bersihkan_layar()
+        cetak(rangkai_meja(keranjang, diskon, pesan), akhir="")
+        variabel p = dasar.baca_pilihan(6)
+        pesan = ""
+        jika p == -2 {
+            berjalan = salah
+        } jika_lain p == -3 {
+            pesan = ""
+        } jika_lain p == -1 {
+            pesan = "Ketik nomor aksi dulu, Bos (0-6)."
+        } jika_lain p == 0 {
+            jika panjang(keranjang) > 0 {
+                variabel jwb = baca_isian("  Keranjang belum kosong. Tinggalkan? [y/t] : ")
+                jika jwb != kosong dan jwb != "" dan huruf_besar(jwb) == "Y" {
+                    berjalan = salah
+                } selain {
+                    pesan = "Belanjaan masih disimpan di keranjang, Bos."
+                }
+            } selain {
+                berjalan = salah
+            }
+        } selain {
+            coba {
+                jika p == 1 {
+                    keranjang = aksi_tambah(db, keranjang)
+                } jika_lain p == 2 {
+                    keranjang = aksi_ubah(db, keranjang)
+                } jika_lain p == 3 {
+                    keranjang = aksi_hapus(keranjang)
+                } jika_lain p == 4 {
+                    diskon = aksi_diskon(keranjang, diskon)
+                } jika_lain p == 5 {
+                    variabel r = aksi_bayar(db, keranjang, diskon)
+                    jika r == 1 {
+                        keranjang = []
+                        diskon = 0
+                    }
+                } jika_lain p == 6 {
+                    keranjang = aksi_kosong(keranjang)
+                    jika panjang(keranjang) == 0 {
+                        diskon = 0
+                    }
+                }
+            } kecuali GalatValidasi sebagai e {
+                dasar.dialog(e.pesan)
+            } kecuali GalatData sebagai e {
+                dasar.dialog(e.pesan)
+            }
+        }
+    }
+    kembalikan 0
+}

@@ -117,6 +117,11 @@ Pendukung: `poc_bantuan.idk`, `poc_siklus_a.idk`, `poc_siklus_b.idk` (impor), `d
 - Menjalankan file secara langsung: kode tingkat atas berjalan, `uji_*` TIDAK dieksekusi.
 - `indk periksa <file...>`: statis, 0 temuan pada seluruh berkas PoC (exit 0). **Cek sintaks saja — TIDAK menangkap variabel tak terdefinisi** (terbukti Fase 2: nama parameter `baruang` vs pemakaian `barangg` → periksa 0 temuan, runtime exit 70 "Variabel tidak terdefinisi 'barangg'") → selalu jalankan `indk uji`/aplikasi setelah periksa.
 
+### 2.11 Batas konstanta per fungsi
+
+- **`Kesalahan di '<titik>': Terlalu banyak konstanta dalam satu chunk`** — batas jumlah konstanta per fungsi terlampaui (terbukti Fase 3: `rangkai_meja` ~350+ konstanta → error mulai baris pertama yang melampaui, lalu berantai ke fungsi berikutnya karena kompilasi satu berkas). Solusi: **pecah fungsi besar menjadi fungsi-fungsi kecil** (mis. `meja_tabel` + `menu_meja` dipanggil `rangkai_meja`) — periksa kembali setelah pemecahan.
+- Error konstanta bisa berantai menutupi error parse nyata di bawahnya (Fase 3: `} jika_lain {` telanjang memunculkan "Harapkan ':' setelah kunci kamus" palsu); perbaiki error pertama, jalankan ulang periksa untuk melihat sisa yang sebenarnya.
+
 ## 3. Keputusan Teknis yang Mengikat
 
 1. **Menu bernomor `[1-N]` + `input()`** — tanpa modul `Konsol`/raw-key/panah (tidak ada di v1.4.0). Footer: `[1-N] Pilih | [Enter] Konfirmasi | [0] Keluar`.
@@ -133,13 +138,13 @@ Pendukung: `poc_bantuan.idk`, `poc_siklus_a.idk`, `poc_siklus_b.idk` (impor), `d
 12. **Impor hanya bentuk modern** `impor nama` / `impor paket.modul` / `dari x impor y`. Aplikasi selalu dijalankan dari **akar proyek** dengan **`INDK_PATH=<akar proyek>`** (diatur launcher `warung.cmd`) sehingga modul subdirektori (mis. `impor inti.koneksi`) terjangkau dari modul mana pun, termasuk dari modul bersarang. Bentuk legacy `impor "path"` hanya cadangan pengujian (CWD + bocor namespace). **Jangan mengandalkan kegagalan load modul — senyap (exit 70).**
 13. **`indk uji` dipakai untuk seluruh `uji_*` aplikasi** (exit 1 saat gagal → andalkan untuk gerbang kualitas).
 
-## 4. Celah Terbuka (lanjut ke Fase 1+)
+## 4. Celah Terbuka (lanjut ke Fase 1+) — semua sudah tertutup
 
-- Ambigu `tanggal()["hari_minggu"]` — konfirmasi pada hari Min (nilai ekspektasi: 0 bila `%w`, 7 bila `%u`).
-- Render clear-screen/redraw ANSI pada Windows Terminal — buktikan saat membangun `tampilan` Fase 1.
-- Semantik rollback saat galat di tengah transaksi (apakah `db_batal` otomatis dijalankan pustaka) — uji di Fase 3.
-- `format()` tanpa gaya — buat pembungkus angka/ruang di `inti/`.
-- Pesan galat SQLite berbahasa Inggris — kebutuhan terjemahan pesan (DESIGN §6) ditangani layer layanan.
+- ~~Ambigu `tanggal()["hari_minggu"]`~~ — tertutup Fase 1 (`uji_kalender` lulus).
+- ~~Render clear-screen/redraw ANSI pada Windows Terminal~~ — tertutup Fase 1 (skenario aplikasi membuktikan redraw terender).
+- ~~Semantik rollback saat galat di tengah transaksi~~ — tertutup Fase 3 (`uji_kasir_rollback`): **`db_batal` TIDAK otomatis** — pustaka hanya melempar `GalatNilai`; layer layanan wajib memanggil `db_batal` sendiri dalam blok `kecuali`.
+- ~~`format()` tanpa gaya~~ — tertutup Fase 2 (`inti/format.idk` → `rupiah`).
+- ~~Pesan galat SQLite berbahasa Inggris~~ — tertutup Fase 3 (`inti/pesan.idk` → `terjemah_db`).
 
 ## 5. Perintah Reproduksi
 

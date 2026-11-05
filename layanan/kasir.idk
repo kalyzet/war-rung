@@ -1,0 +1,106 @@
+# layanan/kasir.idk — Aturan transaksi penjualan tunai (PRD §5.2–5.4, Fase 3).
+
+impor repositori.transaksi
+impor repositori.barang
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.pesan impor terjemah_db
+dari inti.format impor rupiah
+
+fungsi jumlah_keranjang(keranjang) {
+    variabel n = 0
+    untuk it dalam keranjang {
+        n = n + it["jumlah"]
+    }
+    kembalikan n
+}
+
+fungsi kode_transaksi(db) {
+    variabel hari = potong(format_tanggal("%Y-%m-%d %H:%M:%S"), 0, 10)
+    variabel n = transaksi.jumlah_hari(db, hari)
+    kembalikan "TRX-" + ganti(hari, "-", "") + "-" + ke_teks(n + 1)
+}
+
+fungsi ringkasan(keranjang, diskon) {
+    jika panjang(keranjang) == 0 {
+        naikkan GalatValidasi("Keranjangnya masih kosong, Bos.")
+    }
+    variabel subtotal = 0
+    untuk it dalam keranjang {
+        jika it["jumlah"] <= 0 {
+            naikkan GalatValidasi("Jumlah pembelian harus lebih dari nol, Bos.")
+        }
+        subtotal = subtotal + it["barang"]["harga_jual"] * it["jumlah"]
+    }
+    jika diskon < 0 {
+        naikkan GalatValidasi("Diskonnya tidak boleh minus, Bos.")
+    }
+    jika diskon > subtotal {
+        naikkan GalatValidasi("Diskonnya kebanyakan, Bos. Maksimal Rp " + rupiah(subtotal) + ".")
+    }
+    kembalikan {"subtotal": subtotal, "total": subtotal - diskon}
+}
+
+fungsi simpan(db, keranjang, diskon, tunai) {
+    variabel s = ringkasan(keranjang, diskon)
+    jika tunai < s["total"] {
+        naikkan GalatValidasi("Uang tunai yang dibayar kurang dari total belanja, Bos.")
+    }
+    variabel segar = []
+    untuk it dalam keranjang {
+        variabel b = barang.berdasarkan_id(db, it["barang"]["id"])
+        jika b == kosong {
+            naikkan GalatData("Barang ID " + ke_teks(it["barang"]["id"]) + " sudah tidak ada di gudang, Bos.")
+        }
+        jika b["stok"] < it["jumlah"] {
+            naikkan GalatValidasi("Stok " + b["nama"] + " tinggal " + ke_teks(b["stok"]) + ", Bos. Kurangi jumlahnya ya.")
+        }
+        tambah(segar, {"b": b, "jumlah": it["jumlah"]})
+    }
+    variabel kode = kode_transaksi(db)
+    variabel tanggal = format_tanggal("%Y-%m-%d %H:%M:%S")
+    coba {
+        db_mulai(db)
+        variabel tid = transaksi.tambah(db, {
+            "kode": kode,
+            "pelanggan_id": kosong,
+            "tanggal": tanggal,
+            "subtotal": s["subtotal"],
+            "diskon": diskon,
+            "total": s["total"],
+            "dibayar": s["total"],
+            "kembalian": tunai - s["total"],
+            "status": "lunas"
+        })
+        untuk it dalam segar {
+            variabel b = it["b"]
+            transaksi.tambah_detail(db, {
+                "transaksi_id": tid,
+                "barang_id": b["id"],
+                "nama_barang": b["nama"],
+                "harga_satuan": b["harga_jual"],
+                "harga_beli": b["harga_beli"],
+                "jumlah": it["jumlah"],
+                "subtotal": b["harga_jual"] * it["jumlah"]
+            })
+            transaksi.kurangi_stok(db, b["id"], it["jumlah"])
+            barang.catat_stok(db, b["id"], "keluar", it["jumlah"], b["stok"], b["stok"] - it["jumlah"], kode)
+        }
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan transaksi"))
+    }
+    kembalikan {
+        "kode": kode,
+        "tanggal": tanggal,
+        "subtotal": s["subtotal"],
+        "diskon": diskon,
+        "total": s["total"],
+        "tunai": tunai,
+        "kembalian": tunai - s["total"],
+        "jumlah_barang": jumlah_keranjang(keranjang)
+    }
+}

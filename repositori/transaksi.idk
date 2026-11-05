@@ -1,0 +1,22 @@
+# repositori/transaksi.idk — Akses data transaksi & detail_transaksi (PRD §6.3–6.4).
+
+fungsi jumlah_hari(db, hari) {
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi WHERE tanggal LIKE ?", [hari + "%"])
+    kembalikan r["jml"]
+}
+
+fungsi tambah(db, t) {
+    db_eksekusi(db, "INSERT INTO transaksi (kode, pelanggan_id, tanggal, subtotal, diskon, total, dibayar, kembalian, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [t["kode"], t["pelanggan_id"], t["tanggal"], t["subtotal"], t["diskon"], t["total"], t["dibayar"], t["kembalian"], t["status"]])
+    kembalikan db_id_terakhir(db)
+}
+
+fungsi tambah_detail(db, d) {
+    db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)", [d["transaksi_id"], d["barang_id"], d["nama_barang"], d["harga_satuan"], d["harga_beli"], d["jumlah"], d["subtotal"]])
+}
+
+fungsi kurangi_stok(db, id, jumlah) {
+    db_eksekusi(db, "UPDATE barang SET stok = stok - ? WHERE id = ? AND stok >= ?", [jumlah, id, jumlah])
+    jika db_baris_terpengaruh(db) == 0 {
+        naikkan GalatNilai("stok tidak mencukupi")
+    }
+}

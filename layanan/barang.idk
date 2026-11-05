@@ -2,16 +2,9 @@
 
 impor repositori.barang
 dari model.barang impor dari_baris, dari_baris_banyak
-dari teks impor teks_pangkas, teks_berisi
+dari teks impor teks_pangkas
 dari inti.galat impor GalatValidasi, GalatData
-
-fungsi pesan_db(e, aksi) {
-    variabel pesan = e.pesan
-    jika teks_berisi(pesan, "UNIQUE") atau teks_berisi(pesan, "unique") {
-        kembalikan "SKU itu baru saja dipakai barang lain, Bos."
-    }
-    kembalikan "Gagal " + aksi + ". Basis datanya lagi sibuk, coba lagi ya, Bos."
-}
+dari inti.pesan impor terjemah_db
 
 fungsi periksa_data(data) {
     jika panjang(data["sku"]) == 0 {
@@ -62,7 +55,7 @@ fungsi tambah(db, data) {
             db_batal(db)
         } kecuali Galat {
         }
-        naikkan GalatValidasi(pesan_db(e, "menyimpan barang baru"))
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan barang baru"))
     }
 }
 
@@ -96,7 +89,7 @@ fungsi ubah(db, id, data) {
             db_batal(db)
         } kecuali Galat {
         }
-        naikkan GalatValidasi(pesan_db(e, "menyimpan perubahan barang"))
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan perubahan barang"))
     }
 }
 
@@ -129,7 +122,7 @@ fungsi hapus_permanen(db, id) {
             db_batal(db)
         } kecuali Galat {
         }
-        naikkan GalatValidasi(pesan_db(e, "menghapus barang"))
+        naikkan GalatValidasi(terjemah_db(e, "menghapus barang"))
     }
 }
 

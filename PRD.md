@@ -450,7 +450,7 @@ Aktivitas:
 - Membuat menu utama CLI.
 - Membuat error handling dasar.
 
-Hasil: Fondasi aplikasi War-Rung.
+Hasil: Fondasi aplikasi War-Rung — **selesai** (uji fondasi 5/5 lulus).
 
 ### Fase 2 — Product Management
 
@@ -462,7 +462,7 @@ Aktivitas:
 - Pengelolaan harga.
 - Pengelolaan stok awal.
 
-Hasil: Modul manajemen barang.
+Hasil: Modul manajemen barang — **selesai** (uji barang 8/8 lulus).
 
 ### Fase 3 — Cashier System
 
@@ -477,7 +477,7 @@ Aktivitas:
 - Pengurangan stok otomatis.
 - Transaction commit dan rollback.
 
-Hasil: Sistem kasir berfungsi.
+Hasil: Sistem kasir berfungsi — **selesai** (uji kasir 10/10 lulus; tunai saja sesuai §10, bon menyusul Fase 4).
 
 ### Fase 4 — Inventory and Customer Debt
 
@@ -623,4 +623,4 @@ Selain menghasilkan aplikasi yang berfungsi, proyek ini diharapkan memberikan ga
 **Dokumen:** PRD.md  
 **Proyek:** War-Rung  
 **Versi Dokumen:** 1.1.0  
-**Status:** Draft — Fase 0 (Proof of Concept) selesai; menuju Fase 1
+**Status:** Draft — Fase 0–3 selesai (PoC, fondasi, barang, kasir; seluruh uji lulus, periksa 0 temuan); menuju Fase 4

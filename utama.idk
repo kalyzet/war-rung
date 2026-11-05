@@ -7,6 +7,7 @@ impor inti.koneksi
 impor basis_data.seed
 impor tampilan.dasar
 impor tampilan.barang
+impor tampilan.kasir
 impor inti.papan
 dari teks impor teks_ulang
 
@@ -67,7 +68,9 @@ fungsi aplikasi() {
         } selain {
             kosong_berturut = 0
             peringatan = ""
-            jika p == 2 {
+            jika p == 1 {
+                kasir.jalankan(db)
+            } jika_lain p == 2 {
                 barang.jalankan(db)
             } selain {
                 dasar.dialog("Modul " + PILIHAN[p - 1] + " menyusul di fase berikutnya, Bos.")

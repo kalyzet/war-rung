@@ -1,0 +1,263 @@
+# uji_kasir.idk — Uji otomatis Fase 3 (Kasir, PRD §3.2 & §5.2–5.4).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_kasir.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+impor layanan.barang
+impor layanan.kasir
+impor repositori.transaksi
+dari teks impor teks_berisi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi siapkan(db) {
+    barang.tambah(db, {"sku": "SKU-KOPI", "nama": "Kopi Senja", "harga_beli": 5000, "harga_jual": 7000, "stok": 10, "stok_minimum": 2})
+    barang.tambah(db, {"sku": "SKU-ROTI", "nama": "Roti Bakar", "harga_beli": 3000, "harga_jual": 5000, "stok": 5, "stok_minimum": 1})
+}
+
+fungsi item(db, sku, jumlah) {
+    variabel h = barang.cari(db, sku)
+    pastikan panjang(h) == 1, "setup: " + sku + " ketemu satu"
+    kembalikan {"barang": h[0], "jumlah": jumlah}
+}
+
+fungsi uji_kasir_kosong() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel pesan = ""
+    coba {
+        kasir.ringkasan([], 0)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "ringkasan keranjang kosong ditolak"
+    pastikan teks_berisi(pesan, "masih kosong"), "pesan keranjang kosong ramah"
+    pesan = ""
+    coba {
+        kasir.simpan(db, [], 0, 10000)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "simpan keranjang kosong ditolak"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "tidak ada transaksi tersimpan"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_jumlah_nol() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-KOPI", 0)]
+    variabel pesan = ""
+    coba {
+        kasir.ringkasan(k, 0)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "jumlah 0 ditolak"
+    pastikan teks_berisi(pesan, "lebih dari nol"), "pesan jumlah ramah"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "transaksi tidak tercatat"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_diskon() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-KOPI", 2)]
+    variabel pesan = ""
+    coba {
+        kasir.ringkasan(k, -100)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "diskon minus ditolak"
+    pastikan teks_berisi(pesan, "tidak boleh minus"), "pesan diskon minus ramah"
+    pesan = ""
+    coba {
+        kasir.ringkasan(k, 20000)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "diskon melebihi subtotal ditolak"
+    pastikan teks_berisi(pesan, "kebanyakan"), "pesan diskon berlebih ramah"
+    pastikan teks_berisi(pesan, "Maksimal"), "pesan menyebut batas maksimal"
+    variabel s = kasir.ringkasan(k, 1000)
+    pastikan s["subtotal"] == 14000, "subtotal 2 x 7000"
+    pastikan s["total"] == 13000, "total setelah diskon 1000"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_tunai_kurang() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-KOPI", 2)]
+    variabel pesan = ""
+    coba {
+        kasir.simpan(db, k, 0, 10000)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "tunai kurang dari total ditolak"
+    pastikan teks_berisi(pesan, "kurang dari total belanja"), "pesan tunai kurang persis"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "transaksi gagal tidak tercatat"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_stok_kurang() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-ROTI", 6)]
+    variabel pesan = ""
+    coba {
+        kasir.simpan(db, k, 0, 100000)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "jumlah melebihi stok ditolak"
+    pastikan teks_berisi(pesan, "tinggal 5"), "pesan stok menyisa persis"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "transaksi tidak tercatat"
+    r = db_ambil_satu(db, "SELECT stok FROM barang WHERE sku = 'SKU-ROTI'")
+    pastikan r["stok"] == 5, "stok tidak berubah"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_barang_hilang() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-KOPI", 2)]
+    db_eksekusi(db, "DELETE FROM riwayat_stok WHERE barang_id = (SELECT id FROM barang WHERE sku = 'SKU-KOPI')", [])
+    db_eksekusi(db, "DELETE FROM barang WHERE sku = 'SKU-KOPI'", [])
+    variabel pesan = ""
+    coba {
+        kasir.simpan(db, k, 0, 100000)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "barang hilang ditolak GalatData"
+    pastikan teks_berisi(pesan, "tidak ada di gudang"), "pesan barang hilang ramah"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "transaksi tidak tercatat"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_lunas() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = []
+    tambah(k, item(db, "SKU-KOPI", 2))
+    tambah(k, item(db, "SKU-ROTI", 1))
+    variabel h = kasir.simpan(db, k, 1000, 20000)
+    pastikan teks_berisi(h["kode"], "TRX-"), "kode transaksi berawal TRX-"
+    pastikan h["subtotal"] == 19000, "subtotal 14000 + 5000"
+    pastikan h["diskon"] == 1000, "diskon tercatat"
+    pastikan h["total"] == 18000, "total 19000 - 1000"
+    pastikan h["tunai"] == 20000, "tunai tercatat"
+    pastikan h["kembalian"] == 2000, "kembalian 2000"
+    pastikan h["jumlah_barang"] == 3, "jumlah barang 3"
+    pastikan h["tanggal"] != kosong, "tanggal terisi"
+    variabel t = db_ambil_satu(db, "SELECT * FROM transaksi WHERE kode = ?", [h["kode"]])
+    pastikan t["status"] == "lunas", "status lunas"
+    pastikan t["dibayar"] == 18000, "dibayar = total"
+    pastikan t["kembalian"] == 2000, "kembalian tersimpan"
+    pastikan t["pelanggan_id"] == kosong, "pelanggan kosong (tunai tanpa pelanggan)"
+    pastikan t["subtotal"] == 19000, "subtotal di baris transaksi"
+    pastikan t["total"] == 18000, "total di baris transaksi"
+    variabel d = db_ambil_semua(db, "SELECT * FROM detail_transaksi WHERE transaksi_id = ? ORDER BY id", [t["id"]])
+    pastikan panjang(d) == 2, "dua baris detail"
+    pastikan d[0]["nama_barang"] == "Kopi Senja", "snapshot nama barang pertama"
+    pastikan d[0]["harga_satuan"] == 7000, "snapshot harga jual"
+    pastikan d[0]["harga_beli"] == 5000, "snapshot harga beli"
+    pastikan d[0]["jumlah"] == 2, "jumlah item pertama"
+    pastikan d[0]["subtotal"] == 14000, "subtotal item pertama"
+    pastikan d[1]["nama_barang"] == "Roti Bakar", "snapshot nama barang kedua"
+    pastikan d[1]["subtotal"] == 5000, "subtotal item kedua"
+    variabel s = db_ambil_satu(db, "SELECT stok FROM barang WHERE sku = 'SKU-KOPI'")
+    pastikan s["stok"] == 8, "stok kopi 10 - 2"
+    s = db_ambil_satu(db, "SELECT stok FROM barang WHERE sku = 'SKU-ROTI'")
+    pastikan s["stok"] == 4, "stok roti 5 - 1"
+    variabel w = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = (SELECT id FROM barang WHERE sku = 'SKU-KOPI') ORDER BY id")
+    pastikan panjang(w) == 2, "riwayat awal + keluar = 2"
+    pastikan w[1]["jenis"] == "keluar", "riwayat terakhir jenis keluar"
+    pastikan w[1]["jumlah"] == 2, "keluar 2"
+    pastikan w[1]["stok_sebelum"] == 10, "stok sebelum 10"
+    pastikan w[1]["stok_sesudah"] == 8, "stok sesudah 8"
+    pastikan w[1]["keterangan"] == h["kode"], "keterangan = kode transaksi"
+    db_eksekusi(db, "UPDATE barang SET harga_jual = 99999 WHERE sku = 'SKU-KOPI'", [])
+    d = db_ambil_semua(db, "SELECT * FROM detail_transaksi WHERE transaksi_id = ? ORDER BY id", [t["id"]])
+    pastikan d[0]["harga_satuan"] == 7000, "harga detail tetap setelah harga berubah"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_kode_unik() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel k = [item(db, "SKU-KOPI", 1)]
+    variabel h1 = kasir.simpan(db, k, 0, 7000)
+    variabel h2 = kasir.simpan(db, k, 0, 7000)
+    pastikan teks_berisi(h1["kode"], "TRX-"), "kode pertama TRX-"
+    pastikan teks_berisi(h2["kode"], "TRX-"), "kode kedua TRX-"
+    pastikan h1["kode"] != h2["kode"], "dua kode transaksi berbeda"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 2, "dua transaksi tersimpan"
+    r = db_ambil_satu(db, "SELECT COUNT(DISTINCT kode) AS jml FROM transaksi")
+    pastikan r["jml"] == 2, "dua kode unik"
+    db_tutup(db)
+}
+
+fungsi uji_kasir_rollback() {
+    variabel db = db_segar()
+    siapkan(db)
+    db_mulai(db)
+    transaksi.tambah(db, {
+        "kode": "TRX-UJI-ROLLBACK",
+        "pelanggan_id": kosong,
+        "tanggal": "2026-01-01 00:00:00",
+        "subtotal": 7000,
+        "diskon": 0,
+        "total": 7000,
+        "dibayar": 7000,
+        "kembalian": 0,
+        "status": "lunas"
+    })
+    variabel pesan = ""
+    coba {
+        transaksi.tambah_detail(db, {
+            "transaksi_id": 1,
+            "barang_id": 1,
+            "nama_barang": "Salah",
+            "harga_satuan": 7000,
+            "harga_beli": 5000,
+            "jumlah": 0,
+            "subtotal": 7000
+        })
+    } kecuali GalatNilai sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "detail jumlah 0 ditolak CHECK skema"
+    db_batal(db)
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "rollback menghapus transaksi parsial"
+    r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM detail_transaksi")
+    pastikan r["jml"] == 0, "rollback menghapus detail parsial"
+    db_tutup(db)
+}
+
+fungsi uji_jumlah_keranjang() {
+    variabel db = db_segar()
+    siapkan(db)
+    pastikan kasir.jumlah_keranjang([]) == 0, "keranjang kosong = 0"
+    variabel k = []
+    tambah(k, item(db, "SKU-KOPI", 2))
+    tambah(k, item(db, "SKU-ROTI", 3))
+    pastikan kasir.jumlah_keranjang(k) == 5, "jumlah total = 5"
+    db_tutup(db)
+}
