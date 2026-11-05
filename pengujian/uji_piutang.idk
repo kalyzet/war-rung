@@ -1,0 +1,266 @@
+# uji_piutang.idk — Uji otomatis Fase 4 (Pelanggan & Piutang, PRD §3.4–3.5).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_piutang.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+impor inti.papan
+impor layanan.barang
+impor layanan.pelanggan
+impor layanan.bon
+impor layanan.kasir
+dari teks impor teks_berisi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi siapkan(db) {
+    barang.tambah(db, {"sku": "SKU-KOPI", "nama": "Kopi Senja", "harga_beli": 5000, "harga_jual": 7000, "stok": 10, "stok_minimum": 2})
+    pelanggan.tambah(db, {"nama": "Bu Siti", "telepon": "081234567890", "alamat": "Jl. Melati No. 3"})
+}
+
+fungsi ambil_pelanggan(db) {
+    variabel h = pelanggan.cari(db, "Bu Siti")
+    pastikan panjang(h) == 1, "setup: Bu Siti ketemu satu"
+    kembalikan h[0]
+}
+
+fungsi buat_bon(db, pid) {
+    variabel h = barang.cari(db, "SKU-KOPI")
+    variabel k = [{"barang": h[0], "jumlah": 2}]
+    kembalikan kasir.simpan_bon(db, k, 0, pid)
+}
+
+fungsi ambil_transaksi(db, kode) {
+    kembalikan db_ambil_satu(db, "SELECT * FROM transaksi WHERE kode = ?", [kode])
+}
+
+fungsi uji_pelanggan_nama_kosong() {
+    variabel db = db_segar()
+    variabel pesan = ""
+    coba {
+        pelanggan.tambah(db, {"nama": "  ", "telepon": "", "alamat": ""})
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "nama kosong ditolak"
+    pastikan teks_berisi(pesan, "jangan kosong"), "pesan nama kosong ramah"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM pelanggan")
+    pastikan r["jml"] == 0, "pelanggan tidak tersimpan"
+    db_tutup(db)
+}
+
+fungsi uji_pelanggan_crud() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    pastikan p["nama"] == "Bu Siti", "nama tersimpan"
+    pastikan p["telepon"] == "081234567890", "telepon tersimpan"
+    pastikan p["alamat"] == "Jl. Melati No. 3", "alamat tersimpan"
+    variabel d = pelanggan.detail(db, p["id"])
+    pastikan d["nama"] == "Bu Siti", "detail nama"
+    pelanggan.ubah(db, p["id"], {"nama": "Bu Siti Baru", "telepon": "0899", "alamat": "Jl. Mawar"})
+    d = pelanggan.detail(db, p["id"])
+    pastikan d["nama"] == "Bu Siti Baru", "nama terubah"
+    pastikan d["telepon"] == "0899", "telepon terubah"
+    variabel pesan = ""
+    coba {
+        pelanggan.ubah(db, 999, {"nama": "Hantu", "telepon": "", "alamat": ""})
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "ubah id hilang ditolak GalatData"
+    pesan = ""
+    coba {
+        pelanggan.detail(db, 999)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "detail id hilang ditolak GalatData"
+    pastikan teks_berisi(pesan, "tidak ketemu"), "pesan id hilang ramah"
+    variabel h = pelanggan.cari(db, "Siti")
+    pastikan panjang(h) == 1, "cari nama ketemu 1"
+    h = pelanggan.cari(db, "0899")
+    pastikan panjang(h) == 1, "cari telepon ketemu 1"
+    h = pelanggan.cari(db, "zzz-tidak-ada")
+    pastikan panjang(h) == 0, "cari kosong hasilnya 0"
+    pesan = ""
+    coba {
+        pelanggan.cari(db, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "cari kata kosong ditolak"
+    pastikan teks_berisi(pesan, "kosong"), "pesan kata kosong ramah"
+    db_tutup(db)
+}
+
+fungsi uji_bon_tanpa_pelanggan() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel h = barang.cari(db, "SKU-KOPI")
+    variabel k = [{"barang": h[0], "jumlah": 1}]
+    variabel pesan = ""
+    coba {
+        kasir.simpan_bon(db, k, 0, kosong)
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bon tanpa pelanggan ditolak"
+    pastikan teks_berisi(pesan, "harus punya pelanggan"), "pesan tanpa pelanggan ramah"
+    pesan = ""
+    coba {
+        kasir.simpan_bon(db, k, 0, 999)
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bon id pelanggan hilang ditolak GalatData"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM transaksi")
+    pastikan r["jml"] == 0, "transaksi tidak tercatat"
+    variabel s = db_ambil_satu(db, "SELECT stok FROM barang WHERE sku = 'SKU-KOPI'")
+    pastikan s["stok"] == 10, "stok tidak berubah"
+    db_tutup(db)
+}
+
+fungsi uji_bon_simpan() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    variabel b = buat_bon(db, p["id"])
+    pastikan teks_berisi(b["kode"], "TRX-"), "kode bon berawal TRX-"
+    pastikan b["total"] == 14000, "total 2 x 7000"
+    pastikan b["status"] == "bon", "status bon"
+    pastikan b["tunai"] == 0, "tunai 0"
+    pastikan b["kembalian"] == 0, "kembalian 0"
+    pastikan b["sisa"] == 14000, "sisa = total"
+    pastikan b["pelanggan"] == "Bu Siti", "nama pelanggan ikut"
+    variabel t = ambil_transaksi(db, b["kode"])
+    pastikan t["status"] == "bon", "status tersimpan bon"
+    pastikan t["dibayar"] == 0, "dibayar 0"
+    pastikan t["pelanggan_id"] == p["id"], "pelanggan_id terpasang"
+    variabel s = db_ambil_satu(db, "SELECT stok FROM barang WHERE sku = 'SKU-KOPI'")
+    pastikan s["stok"] == 8, "stok berkurang 10 - 2"
+    variabel w = db_ambil_semua(db, "SELECT * FROM riwayat_stok ORDER BY id")
+    pastikan w[panjang(w) - 1]["jenis"] == "keluar", "riwayat terakhir keluar"
+    variabel utang = bon.total_utang_pelanggan(db, p["id"])
+    pastikan utang == 14000, "utang pelanggan 14000"
+    variabel rows = bon.daftar_piutang(db)
+    pastikan panjang(rows) == 1, "satu baris di buku kas"
+    pastikan rows[0]["sisa"] == 14000, "sisa buku kas 14000"
+    pastikan rows[0]["pelanggan"] == "Bu Siti", "nama tampil di buku kas"
+    db_tutup(db)
+}
+
+fungsi uji_cicilan_salah() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    variabel b = buat_bon(db, p["id"])
+    variabel t = ambil_transaksi(db, b["kode"])
+    variabel pesan = ""
+    coba {
+        bon.bayar(db, t["id"], 0, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bayar 0 ditolak"
+    pastikan teks_berisi(pesan, "lebih dari nol"), "pesan bayar nol ramah"
+    pesan = ""
+    coba {
+        bon.bayar(db, t["id"], 14001, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bayar melebihi sisa ditolak"
+    pastikan teks_berisi(pesan, "melebihi sisa utang"), "pesan melebihi sisa ramah"
+    pesan = ""
+    coba {
+        bon.bayar(db, 999, 1000, "")
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bayar transaksi hilang ditolak GalatData"
+    variabel r = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM pembayaran_bon")
+    pastikan r["jml"] == 0, "tidak ada pembayaran tercatat"
+    db_tutup(db)
+}
+
+fungsi uji_cicilan() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    variabel b = buat_bon(db, p["id"])
+    variabel t = ambil_transaksi(db, b["kode"])
+    variabel r = bon.bayar(db, t["id"], 4000, "Cicilan pertama")
+    pastikan r["sisa"] == 10000, "sisa 14000 - 4000"
+    pastikan r["lunas"] == salah, "belum lunas"
+    variabel utang = bon.total_utang_pelanggan(db, p["id"])
+    pastikan utang == 10000, "utang pelanggan 10000"
+    variabel rows = bon.daftar_piutang(db)
+    pastikan panjang(rows) == 1, "masih satu di buku kas"
+    pastikan rows[0]["sisa"] == 10000, "sisa buku kas 10000"
+    variabel pb = db_ambil_semua(db, "SELECT * FROM pembayaran_bon WHERE transaksi_id = ?", [t["id"]])
+    pastikan panjang(pb) == 1, "satu baris pembayaran"
+    pastikan pb[0]["jumlah"] == 4000, "jumlah bayar 4000"
+    pastikan pb[0]["catatan"] == "Cicilan pertama", "catatan tersimpan"
+    variabel d = bon.detail(db, t["id"])
+    pastikan d["dibayar_total"] == 4000, "detail total dibayar 4000"
+    pastikan d["sisa"] == 10000, "detail sisa 10000"
+    pastikan panjang(d["pembayaran"]) == 1, "detail daftar pembayaran"
+    pastikan d["pelanggan"]["nama"] == "Bu Siti", "detail bawa nama pelanggan"
+    variabel ringkas = papan.ambil_papan(db)
+    pastikan teks_berisi(ringkas["piutang"], "10.000"), "papan tulis piutang Rp 10.000"
+    db_tutup(db)
+}
+
+fungsi uji_cicilan_lunas() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    variabel b = buat_bon(db, p["id"])
+    variabel t = ambil_transaksi(db, b["kode"])
+    variabel r = bon.bayar(db, t["id"], 14000, "")
+    pastikan r["sisa"] == 0, "sisa 0 setelah lunas"
+    pastikan r["lunas"] == benar, "lunas benar"
+    t = ambil_transaksi(db, b["kode"])
+    pastikan t["status"] == "lunas", "status transaksi jadi lunas"
+    variabel rows = bon.daftar_piutang(db)
+    pastikan panjang(rows) == 0, "buku kas kosong setelah lunas"
+    variabel utang = bon.total_utang_pelanggan(db, p["id"])
+    pastikan utang == 0, "utang pelanggan 0"
+    variabel pesan = ""
+    coba {
+        bon.bayar(db, t["id"], 1000, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "bayar transaksi lunas ditolak"
+    pastikan teks_berisi(pesan, "bukan bon"), "pesan bukan bon ramah"
+    variabel ringkas = papan.ambil_papan(db)
+    pastikan ringkas["piutang"] == "Rp 0", "papan tulis piutang Rp 0"
+    db_tutup(db)
+}
+
+fungsi uji_riwayat_pelanggan() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel p = ambil_pelanggan(db)
+    variabel b = buat_bon(db, p["id"])
+    variabel t = ambil_transaksi(db, b["kode"])
+    bon.bayar(db, t["id"], 4000, "")
+    variabel w = bon.riwayat_pelanggan(db, p["id"])
+    pastikan panjang(w) == 1, "satu transaksi di riwayat"
+    pastikan w[0]["kode"] == b["kode"], "kode tampil"
+    pastikan w[0]["total"] == 14000, "total tampil"
+    pastikan w[0]["sisa"] == 10000, "sisa riwayat 10000"
+    pastikan w[0]["status"] == "bon", "status riwayat bon"
+    bon.bayar(db, t["id"], 10000, "")
+    w = bon.riwayat_pelanggan(db, p["id"])
+    pastikan w[0]["sisa"] == 0, "sisa riwayat 0 setelah lunas"
+    pastikan w[0]["status"] == "lunas", "status riwayat lunas"
+    db_tutup(db)
+}

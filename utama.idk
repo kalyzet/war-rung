@@ -8,10 +8,11 @@ impor basis_data.seed
 impor tampilan.dasar
 impor tampilan.barang
 impor tampilan.kasir
+impor tampilan.pelanggan
 impor inti.papan
 dari teks impor teks_ulang
 
-variabel PILIHAN = ["Masuk ke Kasir", "Kelola Barang", "Laporan Penjualan", "Pengaturan"]
+variabel PILIHAN = ["Masuk ke Kasir", "Kelola Barang", "Pelanggan & Piutang", "Laporan Penjualan", "Pengaturan"]
 
 # Satu blok layar dirangkai penuh lalu dicetak sekali (DESIGN §5.2).
 fungsi rangkai_layar(peringatan, kosong_berturut, ringkas) {
@@ -72,6 +73,8 @@ fungsi aplikasi() {
                 kasir.jalankan(db)
             } jika_lain p == 2 {
                 barang.jalankan(db)
+            } jika_lain p == 3 {
+                pelanggan.jalankan(db)
             } selain {
                 dasar.dialog("Modul " + PILIHAN[p - 1] + " menyusul di fase berikutnya, Bos.")
             }

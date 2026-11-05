@@ -1,0 +1,64 @@
+# layanan/pelanggan.idk — Aturan bisnis pelanggan (PRD §3.4, DESIGN §6).
+
+impor repositori.pelanggan
+dari model.pelanggan impor dari_baris, dari_baris_banyak
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.pesan impor terjemah_db
+dari teks impor teks_pangkas
+
+fungsi periksa_data(data) {
+    jika panjang(teks_pangkas(data["nama"])) == 0 {
+        naikkan GalatValidasi("Nama pelanggan jangan kosong, Bos.")
+    }
+}
+
+fungsi tambah(db, data) {
+    periksa_data(data)
+    coba {
+        variabel id = pelanggan.tambah(db, {
+            "nama": teks_pangkas(data["nama"]),
+            "telepon": data["telepon"],
+            "alamat": data["alamat"]
+        })
+        kembalikan id
+    } kecuali GalatNilai sebagai e {
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan pelanggan"))
+    }
+}
+
+fungsi ubah(db, id, data) {
+    periksa_data(data)
+    variabel lama = pelanggan.berdasarkan_id(db, id)
+    jika lama == kosong {
+        naikkan GalatData("Pelanggan ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    coba {
+        pelanggan.ubah(db, id, {
+            "nama": teks_pangkas(data["nama"]),
+            "telepon": data["telepon"],
+            "alamat": data["alamat"]
+        })
+    } kecuali GalatNilai sebagai e {
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan perubahan pelanggan"))
+    }
+}
+
+fungsi daftar(db) {
+    kembalikan dari_baris_banyak(pelanggan.daftar_semua(db))
+}
+
+fungsi cari(db, kata) {
+    variabel k = teks_pangkas(kata)
+    jika panjang(k) == 0 {
+        naikkan GalatValidasi("Kata kuncinya kosong, Bos. Ketik nama atau telepon dulu.")
+    }
+    kembalikan dari_baris_banyak(pelanggan.cari(db, k))
+}
+
+fungsi detail(db, id) {
+    variabel baris = pelanggan.berdasarkan_id(db, id)
+    jika baris == kosong {
+        naikkan GalatData("Pelanggan ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    kembalikan dari_baris(baris)
+}

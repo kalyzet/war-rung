@@ -1,0 +1,163 @@
+# uji_stok.idk — Uji otomatis Fase 4 (Stok, PRD §3.3).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_stok.idk     (exit 0 = lulus, 1 = gagal)
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+impor layanan.barang
+dari teks impor teks_berisi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi siapkan(db) {
+    barang.tambah(db, {"sku": "SKU-KOPI", "nama": "Kopi Senja", "harga_beli": 5000, "harga_jual": 7000, "stok": 10, "stok_minimum": 2})
+    barang.tambah(db, {"sku": "SKU-ROTI", "nama": "Roti Bakar", "harga_beli": 3000, "harga_jual": 5000, "stok": 1, "stok_minimum": 2})
+}
+
+fungsi id_sku(db, sku) {
+    variabel h = barang.cari(db, sku)
+    pastikan panjang(h) == 1, "setup: " + sku + " ketemu satu"
+    kembalikan h[0]["id"]
+}
+
+fungsi uji_stok_masuk() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    variabel baru = barang.stok_masuk(db, id, 5, "")
+    pastikan baru == 15, "stok masuk 10 + 5 = 15"
+    variabel b = barang.detail(db, id)
+    pastikan b["stok"] == 15, "stok tersimpan 15"
+    variabel w = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ? ORDER BY id", [id])
+    pastikan panjang(w) == 2, "riwayat awal + masuk = 2"
+    pastikan w[1]["jenis"] == "masuk", "riwayat terakhir jenis masuk"
+    pastikan w[1]["jumlah"] == 5, "jumlah masuk 5"
+    pastikan w[1]["stok_sebelum"] == 10, "stok sebelum 10"
+    pastikan w[1]["stok_sesudah"] == 15, "stok sesudah 15"
+    pastikan w[1]["keterangan"] == "Stok masuk", "keterangan default 'Stok masuk'"
+    db_tutup(db)
+}
+
+fungsi uji_stok_masuk_keterangan() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    variabel baru = barang.stok_masuk(db, id, 3, "Restock vendor")
+    pastikan baru == 13, "stok masuk 10 + 3 = 13"
+    variabel w = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ? ORDER BY id", [id])
+    pastikan w[1]["keterangan"] == "Restock vendor", "keterangan tersimpan"
+    db_tutup(db)
+}
+
+fungsi uji_stok_masuk_nol() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    variabel pesan = ""
+    coba {
+        barang.stok_masuk(db, id, 0, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "jumlah 0 ditolak"
+    pastikan teks_berisi(pesan, "lebih dari nol"), "pesan jumlah ramah"
+    variabel b = barang.detail(db, id)
+    pastikan b["stok"] == 10, "stok tidak berubah"
+    db_tutup(db)
+}
+
+fungsi uji_stok_masuk_hilang() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel pesan = ""
+    coba {
+        barang.stok_masuk(db, 999, 5, "")
+    } kecuali GalatData sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "barang hilang ditolak GalatData"
+    pastikan teks_berisi(pesan, "tidak ketemu"), "pesan barang hilang ramah"
+    db_tutup(db)
+}
+
+fungsi uji_penyesuaian() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    variabel hasil = barang.penyesuaian_stok(db, id, 7, "")
+    pastikan hasil == 7, "penyesuaian mengembalikan stok baru 7"
+    variabel b = barang.detail(db, id)
+    pastikan b["stok"] == 7, "stok tersimpan 7"
+    variabel w = db_ambil_semua(db, "SELECT * FROM riwayat_stok WHERE barang_id = ? ORDER BY id", [id])
+    pastikan panjang(w) == 2, "riwayat awal + penyesuaian = 2"
+    pastikan w[1]["jenis"] == "penyesuaian", "riwayat terakhir jenis penyesuaian"
+    pastikan w[1]["jumlah"] == -3, "delta -3 (10 → 7)"
+    pastikan w[1]["stok_sebelum"] == 10, "stok sebelum 10"
+    pastikan w[1]["stok_sesudah"] == 7, "stok sesudah 7"
+    pastikan w[1]["keterangan"] == "Penyesuaian manual", "keterangan default"
+    db_tutup(db)
+}
+
+fungsi uji_penyesuaian_salah() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    variabel pesan = ""
+    coba {
+        barang.penyesuaian_stok(db, id, -1, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "stok minus ditolak"
+    pastikan teks_berisi(pesan, "minus"), "pesan stok minus ramah"
+    pesan = ""
+    coba {
+        barang.penyesuaian_stok(db, id, 10, "")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "stok sama ditolak"
+    pastikan teks_berisi(pesan, "memang"), "pesan stok tidak berubah ramah"
+    variabel b = barang.detail(db, id)
+    pastikan b["stok"] == 10, "stok tetap 10"
+    db_tutup(db)
+}
+
+fungsi uji_stok_menipis() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel hasil = barang.stok_menipis(db)
+    pastikan panjang(hasil) == 1, "hanya roti yang menipis"
+    pastikan hasil[0]["sku"] == "SKU-ROTI", "baris menipis = Roti Bakar"
+    pastikan hasil[0]["stok"] == 1, "stok roti 1"
+    db_eksekusi(db, "UPDATE barang SET stok = 3 WHERE sku = 'SKU-ROTI'", [])
+    hasil = barang.stok_menipis(db)
+    pastikan panjang(hasil) == 0, "stok di atas minimum tidak lagi menipis"
+    db_tutup(db)
+}
+
+fungsi uji_riwayat() {
+    variabel db = db_segar()
+    siapkan(db)
+    variabel id = id_sku(db, "SKU-KOPI")
+    barang.stok_masuk(db, id, 5, "Restock")
+    barang.penyesuaian_stok(db, id, 12, "")
+    variabel w = barang.riwayat_stok(db, id, 20)
+    pastikan panjang(w) == 3, "riwayat kopi: awal + masuk + penyesuaian"
+    pastikan w[0]["jenis"] == "penyesuaian", "urutan DESC: terbaru dulu"
+    pastikan w[0]["stok_sesudah"] == 12, "baris terbaru stok 12"
+    pastikan w[1]["jenis"] == "masuk", "baris kedua masuk"
+    pastikan w[1]["keterangan"] == "Restock", "keterangan restock"
+    pastikan w[2]["jenis"] == "masuk", "baris terakhir stok awal"
+    pastikan w[2]["keterangan"] == "Stok awal", "keterangan stok awal"
+    variabel semua = barang.riwayat_stok(db, 0, 20)
+    pastikan panjang(semua) == 4, "id 0 = semua barang (termasuk roti)"
+    variabel batas = barang.riwayat_stok(db, id, 2)
+    pastikan panjang(batas) == 2, "LIMIT batasi baris"
+    db_tutup(db)
+}

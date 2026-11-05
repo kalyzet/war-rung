@@ -1,0 +1,26 @@
+# model/pelanggan.idk — Bentuk data pelanggan dan konversi baris (PRD §3.4, §6.2).
+
+fungsi dari_baris(baris) {
+    variabel telepon = baris["telepon"]
+    jika telepon == kosong {
+        telepon = ""
+    }
+    variabel alamat = baris["alamat"]
+    jika alamat == kosong {
+        alamat = ""
+    }
+    kembalikan {
+        "id": baris["id"],
+        "nama": baris["nama"],
+        "telepon": telepon,
+        "alamat": alamat
+    }
+}
+
+fungsi dari_baris_banyak(baris) {
+    variabel hasil = []
+    untuk p dalam baris {
+        tambah(hasil, dari_baris(p))
+    }
+    kembalikan hasil
+}

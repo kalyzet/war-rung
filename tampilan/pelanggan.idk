@@ -1,0 +1,484 @@
+# tampilan/pelanggan.idk — Layar modul Buku Kas: Pelanggan & Piutang (PRD §3.4–3.5, DESIGN §5.4).
+# Layout teks-polos dulu, warna dibungkus sesudahnya (DESIGN §7.3).
+
+impor tampilan.dasar
+impor layanan.pelanggan
+impor layanan.bon
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.format impor rupiah
+dari teks impor teks_ulang, teks_pangkas, teks_berisi
+
+variabel HALAMAN = 6
+
+fungsi sel_kiri(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kiri(t, lebar), warna_kode)
+}
+
+fungsi sel_kanan(t, lebar, warna_kode) {
+    kembalikan dasar.warna(dasar.kolom_kanan(t, lebar), warna_kode)
+}
+
+fungsi baca_isian(petunjuk) {
+    variabel j = ""
+    coba {
+        j = input(petunjuk)
+    } kecuali Galat {
+        kembalikan kosong
+    }
+    jika j == kosong {
+        kembalikan kosong
+    }
+    kembalikan teks_pangkas(j)
+}
+
+fungsi baca_angka(petunjuk) {
+    variabel j = baca_isian(petunjuk)
+    jika j == kosong {
+        kembalikan kosong
+    }
+    jika j == "" {
+        kembalikan ""
+    }
+    jika teks_berisi(j, ".") atau teks_berisi(j, ",") {
+        naikkan GalatValidasi("Angka ditulis tanpa titik atau koma ya, Bos.")
+    }
+    variabel n = 0
+    coba {
+        n = ke_bulat(ke_angka(j))
+    } kecuali Galat {
+        naikkan GalatValidasi("Itu bukan angka, Bos.")
+    }
+    kembalikan n
+}
+
+fungsi konversi_id(teks) {
+    variabel n = 0
+    coba {
+        n = ke_bulat(ke_angka(teks))
+    } kecuali Galat {
+        naikkan GalatValidasi("ID harus angka ya, Bos.")
+    }
+    kembalikan n
+}
+
+fungsi pilih_nomor(petunjuk, maks) {
+    variabel j = baca_isian(petunjuk)
+    jika j == kosong atau j == "" {
+        kembalikan 0
+    }
+    variabel n = konversi_id(j)
+    jika n < 0 atau n > maks {
+        naikkan GalatValidasi("Nomornya antara 0 dan " + ke_teks(maks) + ", Bos.")
+    }
+    kembalikan n
+}
+
+fungsi batal() {
+    dasar.dialog("Oke, dibatalkan ya, Bos.")
+    kembalikan 0
+}
+
+fungsi halaman_maks(n) {
+    kembalikan (n + HALAMAN - 1) // HALAMAN
+}
+
+fungsi rangkai_menu(pesan) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna(dasar.kolom_kiri("PELANGGAN & PIUTANG", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n\n"
+    variabel pilihan = [["1", "Daftar pelanggan"], ["2", "Cari pelanggan"], ["3", "Tambah pelanggan"], ["4", "Ubah pelanggan"], ["5", "Detail & riwayat"], ["6", "Buku Kas (utang)"], ["7", "Bayar cicilan"]]
+    untuk i dalam rentang(panjang(pilihan)) {
+        b = b + "  " + dasar.warna("[" + pilihan[i][0] + "]", dasar.NYALA) + " " + dasar.TEKS + pilihan[i][1] + dasar.RESET + "\n"
+    }
+    jika panjang(pesan) > 0 {
+        b = b + "\n  " + dasar.warna("! " + pesan, dasar.MERAH) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[0-7] Pilih | [Enter] Konfirmasi | [0] Kembali" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi rangkai_pelanggan(db, baris) {
+    variabel h = "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("Nama", 18, dasar.REDUP) + " " + sel_kiri("Telepon", 13, dasar.REDUP) + " " + sel_kanan("Utang", 10, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 47) + dasar.RESET + "\n"
+    untuk i dalam rentang(panjang(baris)) {
+        variabel p = baris[i]
+        variabel utang = bon.total_utang_pelanggan(db, p["id"])
+        variabel wu = dasar.TEKS
+        jika utang > 0 {
+            wu = dasar.KUNING
+        }
+        h = h + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(p["nama"], 18, dasar.TEKS) + " " + sel_kiri(p["telepon"], 13, dasar.REDUP) + " " + sel_kanan(rupiah(utang), 10, wu) + "\n"
+    }
+    kembalikan h
+}
+
+fungsi rangkai_buku_kas(rows, hal) {
+    variabel jm = halaman_maks(panjang(rows))
+    variabel b = "\n  " + dasar.warna(dasar.kolom_kiri("BUKU KAS — DAFTAR BON", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n"
+    variabel tab = "  " + dasar.REDUP + "Halaman: " + dasar.RESET
+    untuk i dalam rentang(jm) {
+        jika i == hal {
+            tab = tab + dasar.warna(" [" + ke_teks(i + 1) + "]", dasar.NYALA) + " "
+        } selain {
+            tab = tab + dasar.REDUP + "[" + ke_teks(i + 1) + "]" + dasar.RESET + " "
+        }
+    }
+    b = b + tab + "\n"
+    b = b + "  " + sel_kanan("No", 3, dasar.REDUP) + " " + sel_kiri("Kode", 15, dasar.REDUP) + " " + sel_kiri("Tanggal", 16, dasar.REDUP) + " " + sel_kiri("Pelanggan", 14, dasar.REDUP) + " " + sel_kanan("Total", 10, dasar.REDUP) + " " + sel_kanan("Sisa", 10, dasar.REDUP) + "\n"
+    b = b + "  " + dasar.REDUP + teks_ulang("-", 73) + dasar.RESET + "\n"
+    variabel mulai = hal * HALAMAN
+    variabel akhir = mulai + HALAMAN
+    jika akhir > panjang(rows) {
+        akhir = panjang(rows)
+    }
+    untuk i dalam rentang(mulai, akhir) {
+        variabel r = rows[i]
+        b = b + "  " + sel_kanan(ke_teks(i + 1), 3, dasar.TEKS) + " " + sel_kiri(r["kode"], 15, dasar.TEKS) + " " + sel_kiri(r["tanggal"], 16, dasar.TEKS) + " " + sel_kiri(r["pelanggan"], 14, dasar.TEKS) + " " + sel_kanan(rupiah(r["total"]), 10, dasar.TEKS) + " " + sel_kanan(rupiah(r["sisa"]), 10, dasar.KUNING) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[8] Mundur | [9] Maju | [0] Kembali" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi rangkai_riwayat(baris) {
+    variabel h = "  " + sel_kiri("Kode", 15, dasar.REDUP) + " " + sel_kiri("Tanggal", 16, dasar.REDUP) + " " + sel_kanan("Total", 10, dasar.REDUP) + " " + sel_kiri("Status", 7, dasar.REDUP) + " " + sel_kanan("Sisa", 10, dasar.REDUP) + "\n"
+    h = h + "  " + dasar.REDUP + teks_ulang("-", 62) + dasar.RESET + "\n"
+    untuk r dalam baris {
+        variabel ws = dasar.KUNING
+        jika r["status"] == "lunas" {
+            ws = dasar.HIJAU
+        }
+        h = h + "  " + sel_kiri(r["kode"], 15, dasar.TEKS) + " " + sel_kiri(r["tanggal"], 16, dasar.TEKS) + " " + sel_kanan(rupiah(r["total"]), 10, dasar.TEKS) + " " + sel_kiri(r["status"], 7, ws) + " " + sel_kanan(rupiah(r["sisa"]), 10, dasar.TEKS) + "\n"
+    }
+    kembalikan h
+}
+
+fungsi rangkai_tagihan(d) {
+    variabel b = "\n  " + dasar.warna(dasar.kolom_kiri("TAGIHAN BON", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n"
+    variabel label = dasar.REDUP
+    b = b + "  " + label + dasar.kolom_kiri("Kode", 14) + dasar.RESET + ": " + d["kode"] + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Tanggal", 14) + dasar.RESET + ": " + d["tanggal"] + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Pelanggan", 14) + dasar.RESET + ": " + d["pelanggan"] + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Total", 14) + dasar.RESET + ": Rp " + rupiah(d["total"]) + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Sudah bayar", 14) + dasar.RESET + ": Rp " + rupiah(d["total"] - d["sisa"]) + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Sisa utang", 14) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(d["sisa"]), dasar.KUNING + dasar.TEBAL) + "\n"
+    b = b + "\n"
+    kembalikan b
+}
+
+fungsi tampilkan_detail_id(db, id) {
+    variabel p = pelanggan.detail(db, id)
+    variabel utang = bon.total_utang_pelanggan(db, id)
+    variabel riwayat = bon.riwayat_pelanggan(db, id)
+    variabel b = "\n  " + dasar.warna(dasar.kolom_kiri("DETAIL PELANGGAN", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n"
+    variabel label = dasar.REDUP
+    b = b + "  " + label + dasar.kolom_kiri("ID", 14) + dasar.RESET + ": " + ke_teks(p["id"]) + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Nama", 14) + dasar.RESET + ": " + p["nama"] + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Telepon", 14) + dasar.RESET + ": " + p["telepon"] + "\n"
+    b = b + "  " + label + dasar.kolom_kiri("Alamat", 14) + dasar.RESET + ": " + p["alamat"] + "\n"
+    variabel wu = dasar.TEKS
+    jika utang > 0 {
+        wu = dasar.KUNING
+    }
+    b = b + "  " + label + dasar.kolom_kiri("Total utang", 14) + dasar.RESET + ": " + dasar.warna("Rp " + rupiah(utang), wu) + "\n"
+    b = b + "\n  " + dasar.warna(dasar.kolom_kiri("RIWAYAT TRANSAKSI", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n"
+    jika panjang(riwayat) == 0 {
+        b = b + "\n  " + dasar.REDUP + "Belum ada transaksi, Bos." + dasar.RESET + "\n"
+    } selain {
+        b = b + "\n" + rangkai_riwayat(riwayat)
+    }
+    dasar.bersihkan_layar()
+    cetak(b, akhir="")
+    dasar.dialog("Enter untuk kembali, Bos.")
+    kembalikan 0
+}
+
+fungsi tampilkan_daftar(db) {
+    variabel baris = pelanggan.daftar(db)
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("DAFTAR PELANGGAN", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    jika panjang(baris) == 0 {
+        dasar.dialog("Belum ada pelanggan terdaftar, Bos. Mulai dari [3].")
+        kembalikan 0
+    }
+    cetak(rangkai_pelanggan(db, baris), akhir="")
+    variabel no = pilih_nomor("  Lihat detail nomor (0 = kembali) : ", panjang(baris))
+    jika no == 0 {
+        kembalikan 0
+    }
+    tampilkan_detail_id(db, baris[no - 1]["id"])
+    kembalikan 0
+}
+
+fungsi tampilkan_cari(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("CARI PELANGGAN", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel kata = baca_isian("  Kata kunci (nama/telepon) : ")
+    jika kata == kosong atau kata == "" {
+        kembalikan batal()
+    }
+    variabel baris = pelanggan.cari(db, kata)
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("HASIL CARI: " + kata, 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    jika panjang(baris) == 0 {
+        dasar.dialog("Pelanggan '" + kata + "' tidak ketemu, Bos.")
+        kembalikan 0
+    }
+    cetak(rangkai_pelanggan(db, baris), akhir="")
+    variabel no = pilih_nomor("  Lihat detail nomor (0 = kembali) : ", panjang(baris))
+    jika no == 0 {
+        kembalikan 0
+    }
+    tampilkan_detail_id(db, baris[no - 1]["id"])
+    kembalikan 0
+}
+
+fungsi tampilkan_tambah(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("TAMBAH PELANGGAN", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel nama = baca_isian("  Nama (wajib)      : ")
+    jika nama == kosong {
+        kembalikan batal()
+    }
+    variabel telepon = baca_isian("  Telepon (opsional) : ")
+    jika telepon == kosong {
+        kembalikan batal()
+    }
+    variabel alamat = baca_isian("  Alamat (opsional)  : ")
+    jika alamat == kosong {
+        kembalikan batal()
+    }
+    variabel jwb = baca_isian("  Simpan pelanggan? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Tidak jadi disimpan, Bos.")
+        kembalikan 0
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan 0
+    }
+    variabel id = pelanggan.tambah(db, {"nama": nama, "telepon": telepon, "alamat": alamat})
+    dasar.dialog("Pelanggan '" + nama + "' tersimpan, Bos! (ID " + ke_teks(id) + ")")
+    kembalikan 0
+}
+
+fungsi tampilkan_ubah(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("UBAH PELANGGAN", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel jawab = baca_isian("  ID pelanggan (0 = batal) : ")
+    jika jawab == kosong atau jawab == "" {
+        kembalikan batal()
+    }
+    variabel id = konversi_id(jawab)
+    jika id == 0 {
+        kembalikan batal()
+    }
+    variabel p = pelanggan.detail(db, id)
+    cetak("  " + dasar.REDUP + "Enter = tetap seperti semula" + dasar.RESET + "\n\n", akhir="")
+    variabel nama = baca_isian("  Nama (" + p["nama"] + ") : ")
+    jika nama == kosong {
+        kembalikan batal()
+    }
+    jika nama == "" {
+        nama = p["nama"]
+    }
+    variabel telepon = baca_isian("  Telepon (" + p["telepon"] + ") : ")
+    jika telepon == kosong {
+        kembalikan batal()
+    }
+    jika telepon == "" {
+        telepon = p["telepon"]
+    }
+    variabel alamat = baca_isian("  Alamat (" + p["alamat"] + ") : ")
+    jika alamat == kosong {
+        kembalikan batal()
+    }
+    jika alamat == "" {
+        alamat = p["alamat"]
+    }
+    variabel jwb = baca_isian("  Simpan perubahan? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Tidak jadi disimpan, Bos.")
+        kembalikan 0
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan 0
+    }
+    pelanggan.ubah(db, id, {"nama": nama, "telepon": telepon, "alamat": alamat})
+    dasar.dialog("Data " + nama + " diperbarui, Bos!")
+    kembalikan 0
+}
+
+fungsi tampilkan_detail(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("DETAIL & RIWAYAT", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel jawab = baca_isian("  ID pelanggan (0 = batal) : ")
+    jika jawab == kosong atau jawab == "" {
+        kembalikan batal()
+    }
+    variabel id = konversi_id(jawab)
+    jika id == 0 {
+        kembalikan batal()
+    }
+    tampilkan_detail_id(db, id)
+    kembalikan 0
+}
+
+fungsi tampilkan_buku_kas(db) {
+    variabel rows = bon.daftar_piutang(db)
+    jika panjang(rows) == 0 {
+        dasar.dialog("Belum ada bon yang berjalan, Bos.")
+        kembalikan 0
+    }
+    variabel hal = 0
+    variabel maks = halaman_maks(panjang(rows))
+    selagi benar {
+        dasar.bersihkan_layar()
+        cetak(rangkai_buku_kas(rows, hal), akhir="")
+        variabel p = dasar.baca_pilihan(9)
+        jika p == -2 atau p == 0 {
+            kembalikan 0
+        } jika_lain p == -3 {
+            hal = hal
+        } jika_lain p == -1 {
+            dasar.dialog("Ketik 8 (mundur), 9 (maju), atau 0 (kembali), Bos.")
+        } jika_lain p == 8 {
+            jika hal > 0 {
+                hal = hal - 1
+            }
+        } jika_lain p == 9 {
+            jika hal < maks - 1 {
+                hal = hal + 1
+            }
+        }
+    }
+    kembalikan 0
+}
+
+fungsi pilih_piutang(db) {
+    variabel rows = bon.daftar_piutang(db)
+    jika panjang(rows) == 0 {
+        dasar.dialog("Belum ada bon yang berjalan, Bos.")
+        kembalikan kosong
+    }
+    variabel hal = 0
+    variabel maks = halaman_maks(panjang(rows))
+    selagi benar {
+        dasar.bersihkan_layar()
+        cetak(rangkai_buku_kas(rows, hal), akhir="")
+        cetak("  " + dasar.REDUP + "Pilih nomor tagihan yang mau dibayar" + dasar.RESET + "\n\n", akhir="")
+        variabel p = dasar.baca_pilihan(9)
+        jika p == -2 atau p == 0 {
+            kembalikan kosong
+        } jika_lain p == -3 {
+            hal = hal
+        } jika_lain p == -1 {
+            dasar.dialog("Ketik nomor tagihan, 8/9 untuk halaman, atau 0 batal, Bos.")
+        } jika_lain p == 8 {
+            jika hal > 0 {
+                hal = hal - 1
+            }
+        } jika_lain p == 9 {
+            jika hal < maks - 1 {
+                hal = hal + 1
+            }
+        } jika_lain p == 7 {
+            dasar.dialog("Tidak ada nomor 7 di daftar ini, Bos.")
+        } selain {
+            variabel idx = hal * HALAMAN + p - 1
+            jika idx < panjang(rows) {
+                kembalikan rows[idx]
+            }
+            dasar.dialog("Nomor itu di luar halaman ini, Bos.")
+        }
+    }
+    kembalikan kosong
+}
+
+fungsi tampilkan_bayar(db) {
+    variabel d = pilih_piutang(db)
+    jika d == kosong {
+        kembalikan 0
+    }
+    dasar.bersihkan_layar()
+    cetak(rangkai_tagihan(d), akhir="")
+    variabel jml = baca_angka("  Jumlah bayar (maks Rp " + rupiah(d["sisa"]) + ") : ")
+    jika jml == kosong atau jml == "" {
+        dasar.dialog("Pembayaran dibatalkan, Bos.")
+        kembalikan 0
+    }
+    variabel ket = baca_isian("  Catatan (Enter = tanpa) : ")
+    jika ket == kosong {
+        dasar.dialog("Pembayaran dibatalkan, Bos.")
+        kembalikan 0
+    }
+    variabel jwb = baca_isian("  Catat pembayaran Rp " + rupiah(jml) + "? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Tidak jadi disimpan, Bos.")
+        kembalikan 0
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan 0
+    }
+    variabel r = bon.bayar(db, d["id"], jml, ket)
+    jika r["lunas"] {
+        dasar.dialog("LUNAS, Bos! Utang " + d["pelanggan"] + " beres semua.")
+    } selain {
+        dasar.dialog("Tercatat. Sisa utang tinggal Rp " + rupiah(r["sisa"]) + ", Bos.")
+    }
+    kembalikan 0
+}
+
+fungsi jalankan(db) {
+    variabel berjalan = benar
+    variabel pesan = ""
+    selagi berjalan {
+        dasar.bersihkan_layar()
+        cetak(rangkai_menu(pesan), akhir="")
+        variabel p = dasar.baca_pilihan(7)
+        pesan = ""
+        jika p == -2 {
+            berjalan = salah
+        } jika_lain p == -3 {
+            pesan = ""
+        } jika_lain p == -1 {
+            pesan = "Ketik nomor menu dulu, Bos (0-7)."
+        } jika_lain p == 0 {
+            berjalan = salah
+        } selain {
+            coba {
+                jika p == 1 {
+                    tampilkan_daftar(db)
+                } jika_lain p == 2 {
+                    tampilkan_cari(db)
+                } jika_lain p == 3 {
+                    tampilkan_tambah(db)
+                } jika_lain p == 4 {
+                    tampilkan_ubah(db)
+                } jika_lain p == 5 {
+                    tampilkan_detail(db)
+                } jika_lain p == 6 {
+                    tampilkan_buku_kas(db)
+                } jika_lain p == 7 {
+                    tampilkan_bayar(db)
+                }
+            } kecuali GalatValidasi sebagai e {
+                dasar.dialog(e.pesan)
+            } kecuali GalatData sebagai e {
+                dasar.dialog(e.pesan)
+            }
+        }
+    }
+    kembalikan 0
+}

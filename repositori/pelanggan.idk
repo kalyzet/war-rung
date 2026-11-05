@@ -1,0 +1,24 @@
+# repositori/pelanggan.idk — Akses data tabel pelanggan (PRD §6.2).
+# Semua kueri memakai parameter '?' — tanpa interpolasi string ke SQL.
+
+fungsi tambah(db, p) {
+    db_eksekusi(db, "INSERT INTO pelanggan (nama, telepon, alamat) VALUES (?, ?, ?)", [p["nama"], p["telepon"], p["alamat"]])
+    kembalikan db_id_terakhir(db)
+}
+
+fungsi ubah(db, id, p) {
+    db_eksekusi(db, "UPDATE pelanggan SET nama = ?, telepon = ?, alamat = ? WHERE id = ?", [p["nama"], p["telepon"], p["alamat"], id])
+}
+
+fungsi berdasarkan_id(db, id) {
+    kembalikan db_ambil_satu(db, "SELECT * FROM pelanggan WHERE id = ?", [id])
+}
+
+fungsi daftar_semua(db) {
+    kembalikan db_ambil_semua(db, "SELECT * FROM pelanggan ORDER BY nama ASC")
+}
+
+fungsi cari(db, kata) {
+    variabel pola = "%" + kata + "%"
+    kembalikan db_ambil_semua(db, "SELECT * FROM pelanggan WHERE nama LIKE ? OR telepon LIKE ? ORDER BY nama ASC", [pola, pola])
+}

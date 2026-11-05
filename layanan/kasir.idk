@@ -1,7 +1,8 @@
-# layanan/kasir.idk — Aturan transaksi penjualan tunai (PRD §5.2–5.4, Fase 3).
+# layanan/kasir.idk — Aturan transaksi penjualan tunai & bon (PRD §5.2–5.4, Fase 3–4).
 
 impor repositori.transaksi
 impor repositori.barang
+impor repositori.pelanggan
 dari inti.galat impor GalatValidasi, GalatData
 dari inti.pesan impor terjemah_db
 dari inti.format impor rupiah
@@ -40,11 +41,8 @@ fungsi ringkasan(keranjang, diskon) {
     kembalikan {"subtotal": subtotal, "total": subtotal - diskon}
 }
 
-fungsi simpan(db, keranjang, diskon, tunai) {
+fungsi simpan_transaksi(db, keranjang, diskon, dibayar, kembalian, status, pelanggan_id) {
     variabel s = ringkasan(keranjang, diskon)
-    jika tunai < s["total"] {
-        naikkan GalatValidasi("Uang tunai yang dibayar kurang dari total belanja, Bos.")
-    }
     variabel segar = []
     untuk it dalam keranjang {
         variabel b = barang.berdasarkan_id(db, it["barang"]["id"])
@@ -62,14 +60,14 @@ fungsi simpan(db, keranjang, diskon, tunai) {
         db_mulai(db)
         variabel tid = transaksi.tambah(db, {
             "kode": kode,
-            "pelanggan_id": kosong,
+            "pelanggan_id": pelanggan_id,
             "tanggal": tanggal,
             "subtotal": s["subtotal"],
             "diskon": diskon,
             "total": s["total"],
-            "dibayar": s["total"],
-            "kembalian": tunai - s["total"],
-            "status": "lunas"
+            "dibayar": dibayar,
+            "kembalian": kembalian,
+            "status": status
         })
         untuk it dalam segar {
             variabel b = it["b"]
@@ -99,8 +97,35 @@ fungsi simpan(db, keranjang, diskon, tunai) {
         "subtotal": s["subtotal"],
         "diskon": diskon,
         "total": s["total"],
-        "tunai": tunai,
-        "kembalian": tunai - s["total"],
+        "status": status,
         "jumlah_barang": jumlah_keranjang(keranjang)
     }
+}
+
+fungsi simpan(db, keranjang, diskon, tunai) {
+    variabel s = ringkasan(keranjang, diskon)
+    jika tunai < s["total"] {
+        naikkan GalatValidasi("Uang tunai yang dibayar kurang dari total belanja, Bos.")
+    }
+    variabel h = simpan_transaksi(db, keranjang, diskon, s["total"], tunai - s["total"], "lunas", kosong)
+    h["tunai"] = tunai
+    h["kembalian"] = tunai - s["total"]
+    kembalikan h
+}
+
+fungsi simpan_bon(db, keranjang, diskon, pelanggan_id) {
+    variabel s = ringkasan(keranjang, diskon)
+    jika pelanggan_id == kosong {
+        naikkan GalatValidasi("Transaksi bon harus punya pelanggan, Bos.")
+    }
+    variabel p = pelanggan.berdasarkan_id(db, pelanggan_id)
+    jika p == kosong {
+        naikkan GalatData("Pelanggan ID " + ke_teks(pelanggan_id) + " tidak ketemu, Bos.")
+    }
+    variabel h = simpan_transaksi(db, keranjang, diskon, 0, 0, "bon", pelanggan_id)
+    h["tunai"] = 0
+    h["kembalian"] = 0
+    h["sisa"] = s["total"]
+    h["pelanggan"] = p["nama"]
+    kembalikan h
 }

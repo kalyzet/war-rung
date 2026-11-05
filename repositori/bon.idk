@@ -1,0 +1,36 @@
+# repositori/bon.idk — Akses data piutang & pembayaran_bon (PRD §3.5, §6.5).
+# Sisa utang per baris: total − (dibayar + Σ pembayaran_bon.jumlah) (PRD §5.3).
+
+fungsi transaksi_bon(db, id) {
+    kembalikan db_ambil_satu(db, "SELECT * FROM transaksi WHERE id = ?", [id])
+}
+
+fungsi daftar_piutang(db) {
+    kembalikan db_ambil_semua(db, "SELECT t.id, t.kode, t.tanggal, t.total, t.dibayar, t.status, p.nama AS pelanggan, (t.total - t.dibayar - COALESCE(SUM(pb.jumlah), 0)) AS sisa FROM transaksi t JOIN pelanggan p ON p.id = t.pelanggan_id LEFT JOIN pembayaran_bon pb ON pb.transaksi_id = t.id WHERE t.status = 'bon' GROUP BY t.id ORDER BY t.tanggal ASC, t.id ASC")
+}
+
+fungsi piutang_pelanggan(db, pelanggan_id) {
+    kembalikan db_ambil_semua(db, "SELECT t.id, t.kode, t.tanggal, t.total, t.dibayar, t.status, p.nama AS pelanggan, (t.total - t.dibayar - COALESCE(SUM(pb.jumlah), 0)) AS sisa FROM transaksi t JOIN pelanggan p ON p.id = t.pelanggan_id LEFT JOIN pembayaran_bon pb ON pb.transaksi_id = t.id WHERE t.status = 'bon' AND t.pelanggan_id = ? GROUP BY t.id ORDER BY t.tanggal ASC, t.id ASC", [pelanggan_id])
+}
+
+fungsi total_pembayaran(db, transaksi_id) {
+    variabel r = db_ambil_satu(db, "SELECT COALESCE(SUM(jumlah), 0) AS jml FROM pembayaran_bon WHERE transaksi_id = ?", [transaksi_id])
+    kembalikan r["jml"]
+}
+
+fungsi tambah_pembayaran(db, transaksi_id, jumlah, tanggal, catatan) {
+    db_eksekusi(db, "INSERT INTO pembayaran_bon (transaksi_id, jumlah, tanggal, catatan) VALUES (?, ?, ?, ?)", [transaksi_id, jumlah, tanggal, catatan])
+    kembalikan db_id_terakhir(db)
+}
+
+fungsi daftar_pembayaran(db, transaksi_id) {
+    kembalikan db_ambil_semua(db, "SELECT * FROM pembayaran_bon WHERE transaksi_id = ? ORDER BY id ASC", [transaksi_id])
+}
+
+fungsi ubah_status(db, id, status) {
+    db_eksekusi(db, "UPDATE transaksi SET status = ? WHERE id = ?", [status, id])
+}
+
+fungsi riwayat_pelanggan(db, pelanggan_id) {
+    kembalikan db_ambil_semua(db, "SELECT t.id, t.kode, t.tanggal, t.total, t.dibayar, t.status, (t.total - t.dibayar - COALESCE(p.bayar, 0)) AS sisa FROM transaksi t LEFT JOIN (SELECT transaksi_id, SUM(jumlah) AS bayar FROM pembayaran_bon GROUP BY transaksi_id) p ON p.transaksi_id = t.id WHERE t.pelanggan_id = ? ORDER BY t.id DESC", [pelanggan_id])
+}

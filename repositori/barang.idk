@@ -48,3 +48,22 @@ fungsi catat_stok(db, id, jenis, jumlah, sebelum, sesudah, keterangan) {
     variabel tanggal = format_tanggal("%Y-%m-%d %H:%M:%S")
     db_eksekusi(db, "INSERT INTO riwayat_stok (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, tanggal, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?)", [id, jenis, jumlah, sebelum, sesudah, tanggal, keterangan])
 }
+
+fungsi tambah_stok(db, id, jumlah) {
+    db_eksekusi(db, "UPDATE barang SET stok = stok + ? WHERE id = ?", [jumlah, id])
+}
+
+fungsi ubah_stok(db, id, stok_baru) {
+    db_eksekusi(db, "UPDATE barang SET stok = ? WHERE id = ?", [stok_baru, id])
+}
+
+fungsi riwayat_stok(db, id_barang, batas) {
+    jika id_barang > 0 {
+        kembalikan db_ambil_semua(db, "SELECT r.*, b.nama AS nama_barang FROM riwayat_stok r JOIN barang b ON b.id = r.barang_id WHERE r.barang_id = ? ORDER BY r.id DESC LIMIT ?", [id_barang, batas])
+    }
+    kembalikan db_ambil_semua(db, "SELECT r.*, b.nama AS nama_barang FROM riwayat_stok r JOIN barang b ON b.id = r.barang_id ORDER BY r.id DESC LIMIT ?", [batas])
+}
+
+fungsi stok_menipis(db) {
+    kembalikan db_ambil_semua(db, "SELECT * FROM barang WHERE aktif = 1 AND stok <= stok_minimum ORDER BY stok ASC, nama ASC")
+}

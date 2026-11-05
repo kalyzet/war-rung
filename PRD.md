@@ -477,7 +477,7 @@ Aktivitas:
 - Pengurangan stok otomatis.
 - Transaction commit dan rollback.
 
-Hasil: Sistem kasir berfungsi — **selesai** (uji kasir 10/10 lulus; tunai saja sesuai §10, bon menyusul Fase 4).
+Hasil: Sistem kasir berfungsi — **selesai** (uji kasir 10/10 lulus; tunai sesuai §10, bon dituntaskan Fase 4).
 
 ### Fase 4 — Inventory and Customer Debt
 
@@ -491,7 +491,7 @@ Aktivitas:
 - Pembayaran cicilan.
 - Perhitungan sisa piutang.
 
-Hasil: Modul persediaan dan piutang.
+Hasil: Modul persediaan dan piutang — **selesai** (uji stok 8/8 + piutang 8/8; seluruh uji 39/39 lulus, periksa 0 temuan, skenario aplikasi end-to-end lulus: stok masuk/riwayat/menipis → tambah pelanggan → bon → cicilan 4.000 → pelunasan).
 
 ### Fase 5 — Reporting
 
@@ -623,4 +623,4 @@ Selain menghasilkan aplikasi yang berfungsi, proyek ini diharapkan memberikan ga
 **Dokumen:** PRD.md  
 **Proyek:** War-Rung  
 **Versi Dokumen:** 1.1.0  
-**Status:** Draft — Fase 0–3 selesai (PoC, fondasi, barang, kasir; seluruh uji lulus, periksa 0 temuan); menuju Fase 4
+**Status:** Draft — Fase 0–4 selesai (PoC, fondasi, barang, kasir, stok & piutang; seluruh uji 39/39 lulus, periksa 0 temuan, skenario aplikasi lulus); menuju Fase 5

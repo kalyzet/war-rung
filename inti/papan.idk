@@ -8,7 +8,7 @@ fungsi ambil_papan(db) {
     coba {
         variabel hari = potong(format_tanggal("%Y-%m-%d %H:%M:%S"), 0, 10)
         variabel penjualan = db_ambil_satu(db, "SELECT COALESCE(SUM(total), 0) AS jml FROM transaksi WHERE status != 'batal' AND tanggal LIKE ?", [hari + "%"])
-        variabel piutang = db_ambil_satu(db, "SELECT COALESCE(SUM(total - dibayar), 0) AS jml FROM transaksi WHERE status = 'bon'")
+        variabel piutang = db_ambil_satu(db, "SELECT COALESCE(SUM(t.total - t.dibayar - COALESCE(p.bayar, 0)), 0) AS jml FROM transaksi t LEFT JOIN (SELECT transaksi_id, SUM(jumlah) AS bayar FROM pembayaran_bon GROUP BY transaksi_id) p ON p.transaksi_id = t.id WHERE t.status = 'bon'")
         variabel laris = db_ambil_semua(db, "SELECT d.nama_barang AS nama, SUM(d.jumlah) AS jml FROM detail_transaksi d JOIN transaksi t ON t.id = d.transaksi_id WHERE t.status != 'batal' GROUP BY d.barang_id ORDER BY jml DESC, d.nama_barang ASC LIMIT 1")
         variabel aktif = db_ambil_satu(db, "SELECT COUNT(*) AS jml FROM barang WHERE aktif = 1")
         hasil["penjualan"] = "Rp " + rupiah(penjualan["jml"])

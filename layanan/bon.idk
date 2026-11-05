@@ -1,0 +1,78 @@
+# layanan/bon.idk — Aturan piutang & cicilan (PRD §3.5, §5.3, DESIGN §6).
+
+impor repositori.bon
+impor repositori.pelanggan
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.pesan impor terjemah_db
+dari inti.format impor rupiah
+
+fungsi daftar_piutang(db) {
+    kembalikan bon.daftar_piutang(db)
+}
+
+fungsi detail(db, transaksi_id) {
+    variabel t = bon.transaksi_bon(db, transaksi_id)
+    jika t == kosong {
+        naikkan GalatData("Transaksi ID " + ke_teks(transaksi_id) + " tidak ketemu, Bos.")
+    }
+    variabel p = pelanggan.berdasarkan_id(db, t["pelanggan_id"])
+    variabel bayar = bon.daftar_pembayaran(db, transaksi_id)
+    variabel total_bayar = t["dibayar"]
+    untuk b dalam bayar {
+        total_bayar = total_bayar + b["jumlah"]
+    }
+    kembalikan {
+        "transaksi": t,
+        "pelanggan": p,
+        "pembayaran": bayar,
+        "dibayar_total": total_bayar,
+        "sisa": t["total"] - total_bayar
+    }
+}
+
+fungsi bayar(db, transaksi_id, jumlah, catatan) {
+    variabel t = bon.transaksi_bon(db, transaksi_id)
+    jika t == kosong {
+        naikkan GalatData("Transaksi ID " + ke_teks(transaksi_id) + " tidak ketemu, Bos.")
+    }
+    jika t["status"] != "bon" {
+        naikkan GalatValidasi("Transaksi " + t["kode"] + " bukan bon, Bos. Tidak ada utang di situ.")
+    }
+    jika jumlah <= 0 {
+        naikkan GalatValidasi("Pembayaran harus lebih dari nol, Bos.")
+    }
+    variabel sudah = t["dibayar"] + bon.total_pembayaran(db, transaksi_id)
+    variabel sisa = t["total"] - sudah
+    jika jumlah > sisa {
+        naikkan GalatValidasi("Pembayaran melebihi sisa utang, Bos. Sisanya tinggal Rp " + rupiah(sisa) + ".")
+    }
+    variabel tanggal = format_tanggal("%Y-%m-%d %H:%M:%S")
+    coba {
+        db_mulai(db)
+        bon.tambah_pembayaran(db, transaksi_id, jumlah, tanggal, catatan)
+        jika jumlah == sisa {
+            bon.ubah_status(db, transaksi_id, "lunas")
+        }
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(terjemah_db(e, "mencatat cicilan"))
+    }
+    kembalikan {"sisa": sisa - jumlah, "lunas": sisa - jumlah == 0}
+}
+
+fungsi total_utang_pelanggan(db, pelanggan_id) {
+    variabel rows = bon.piutang_pelanggan(db, pelanggan_id)
+    variabel n = 0
+    untuk r dalam rows {
+        n = n + r["sisa"]
+    }
+    kembalikan n
+}
+
+fungsi riwayat_pelanggan(db, pelanggan_id) {
+    kembalikan bon.riwayat_pelanggan(db, pelanggan_id)
+}

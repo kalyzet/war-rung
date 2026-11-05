@@ -81,8 +81,9 @@ _Contoh State:_
   ≈≈≈≈♦≈≈≈≈♦≈≈≈≈♦≈≈≈≈♦≈≈≈≈
   [1] Masuk ke Kasir
   [2] Kelola Barang        ← pilihan aktif (Kuning + hitam)
-  [3] Laporan Penjualan
-  [4] Pengaturan
+  [3] Pelanggan & Piutang
+  [4] Laporan Penjualan
+  [5] Pengaturan
 
   [1-N] Pilih | [Enter] Konfirmasi | [0] Keluar
 ```
@@ -117,6 +118,7 @@ Jika stok menipis saat kasir memasukkan barang, muncul **dialog inline** bergaya
 
 - **Buku Kas 3D:** Daftar utang pelanggan ditampilkan dalam format buku. Terdapat visual tab "Halaman 1, Halaman 2" di bagian bawah layar.
 - **Pencarian:** Cari pelanggan/barang dengan mengetik kata kunci lalu `Enter` (input berbasis baris), hasil disaring dan daftar dirender ulang.
+- **Pembayaran cicilan:** pilih tagihan dari Buku Kas → masukkan nominal → konfirmasi; saat sisa utang 0, status berubah "lunas" dan ditandai hijau.
 
 ## 6. Aksesibilitas & Ramah Pengguna
 

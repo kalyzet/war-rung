@@ -145,3 +145,74 @@ fungsi detail(db, id) {
     }
     kembalikan dari_baris(baris)
 }
+
+fungsi stok_masuk(db, id, jumlah, keterangan) {
+    variabel b = barang.berdasarkan_id(db, id)
+    jika b == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    jika jumlah <= 0 {
+        naikkan GalatValidasi("Jumlah stok masuk harus lebih dari nol, Bos.")
+    }
+    variabel ket = ""
+    jika keterangan != kosong {
+        ket = teks_pangkas(keterangan)
+    }
+    jika panjang(ket) == 0 {
+        ket = "Stok masuk"
+    }
+    coba {
+        db_mulai(db)
+        barang.tambah_stok(db, id, jumlah)
+        barang.catat_stok(db, id, "masuk", jumlah, b["stok"], b["stok"] + jumlah, ket)
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(terjemah_db(e, "mencatat stok masuk"))
+    }
+    kembalikan b["stok"] + jumlah
+}
+
+fungsi penyesuaian_stok(db, id, stok_baru, keterangan) {
+    variabel b = barang.berdasarkan_id(db, id)
+    jika b == kosong {
+        naikkan GalatData("Barang ID " + ke_teks(id) + " tidak ketemu, Bos.")
+    }
+    jika stok_baru < 0 {
+        naikkan GalatValidasi("Stok tidak boleh minus, Bos.")
+    }
+    jika stok_baru == b["stok"] {
+        naikkan GalatValidasi("Stoknya memang " + ke_teks(b["stok"]) + ", Bos. Tidak ada yang diubah.")
+    }
+    variabel ket = ""
+    jika keterangan != kosong {
+        ket = teks_pangkas(keterangan)
+    }
+    jika panjang(ket) == 0 {
+        ket = "Penyesuaian manual"
+    }
+    coba {
+        db_mulai(db)
+        barang.ubah_stok(db, id, stok_baru)
+        barang.catat_stok(db, id, "penyesuaian", stok_baru - b["stok"], b["stok"], stok_baru, ket)
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba {
+            db_batal(db)
+        } kecuali Galat {
+        }
+        naikkan GalatValidasi(terjemah_db(e, "menyesuaikan stok"))
+    }
+    kembalikan stok_baru
+}
+
+fungsi riwayat_stok(db, id_barang, batas) {
+    kembalikan barang.riwayat_stok(db, id_barang, batas)
+}
+
+fungsi stok_menipis(db) {
+    kembalikan dari_baris_banyak(barang.stok_menipis(db))
+}
