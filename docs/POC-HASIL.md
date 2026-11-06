@@ -59,6 +59,13 @@ Pendukung: `poc_bantuan.idk`, `poc_siklus_a.idk`, `poc_siklus_b.idk` (impor), `d
 - Kelas yang terkonfirmasi ADA: `Galat`, `GalatTipe`, `GalatNilai`, `GalatNama`, `GalatAtribut`, `GalatIndeks`, `GalatPencarian`, `GalatOS`, `GalatLuapan`, `GalatIzin`, `GalatKunci`, `GalatAritmetika`, `HentiIterasi`. **`GalatJaringan` TIDAK ada** (padahal disebut panduan) → jangan dirujuk.
 - Indeks list di luar jangkauan DAPAT ditangkap (bertentangan dengan satu pernyataan panduan; mengikuti spesifikasi).
 - `ke_angka()`/`ke_bulat()` gagal → `GalatNilai` (terbukti tertangkap).
+- **Aturan klausa `kecuali` (diverifikasi Fase 5):**
+  - `kecuali X { }` **tanpa `sebagai` = catch-all** — menangkap SEMUA galat apa pun isinya, bukan filter tipe (terbukti: `kecuali GalatNilai { }` tetap menangkap galat tipe `1+"x"`, dan `kecuali GalatTipe { }` tetap menangkap `GalatNilai`). Hanya boleh dipakai sebagai klausa **terakhir**.
+  - Filter tipe WAJIB bentuk `kecuali Tipe sebagai e { }` (terbukti: `kecuali GalatNilai sebagai e` tidak menangkap galat tipe → galat bocor sesuai harapan).
+  - Klausa non-terakhir wajib memakai `sebagai`; `kecuali Tipe { }` diikuti klausa lain → **parse error 65** `'kecuali' tanpa tipe harus menjadi yang terakhir`.
+  - Bentuk `kecuali Tipe e { }` (tanpa `sebagai`) → parse error `Harapkan '{' setelah nama variabel 'kecuali'`.
+- **Kelas galat domain aplikasi TIDAK implicit** (diverifikasi Fase 5): `GalatValidasi`, `GalatData`, `GalatAplikasi` dipakai sebagai nilai/klause tipe hanya setelah `dari inti.galat impor ...`; tanpa impor → `Variabel tidak terdefinisi` exit 70 (baik di `naikkan X(...)` maupun `kecuali X sebagai e`). Berbeda dengan kelas bawaan (`Galat`, `GalatNilai`, `GalatTipe`, ...) yang tersedia tanpa impor — terbukti dari direktori luar proyek tanpa `impor` apa pun.
+- `naikkan GalatNilai` bawaan tanpa argumen; `naikkan GalatNilai("pesan")` → galat `Harapkan 0 argumen tetapi mendapat 1` (kelas bawaan tanpa `init` — konsisten baris atas §2.4).
 
 ### 2.5 Database SQLite
 

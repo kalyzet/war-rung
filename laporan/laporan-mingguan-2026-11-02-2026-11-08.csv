@@ -1,9 +1,0 @@
-"kode","tanggal","barang","jumlah","harga_satuan","harga_beli","subtotal","laba"
-"TRX-20261105-1","2026-11-05 18:14:28","Kopi Senja","2","7000","5000","14000","4000"
-"TRX-20261105-2","2026-11-05 18:14:28","Teh Manis","1","5000","3000","5000","2000"
-
-"ringkasan","nilai"
-"periode","2026-11-02 s/d 2026-11-08"
-"total transaksi","2"
-"omzet","19000"
-"laba kotor","6000"

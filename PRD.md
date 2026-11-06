@@ -539,6 +539,9 @@ Skenario pengujian:
 - Kegagalan database harus ditangani.
 - Kegagalan transaksi harus menjalankan rollback.
 - Riwayat transaksi harus tetap konsisten ketika informasi barang berubah.
+- Laporan harian/mingguan/bulanan harus mengecualikan transaksi berstatus batal.
+- Rentang laporan: awal inklusif, akhir eksklusif (harian = hari ini, mingguan = Senin–minggu berjalan, bulanan = bulan berjalan).
+- Ekspor CSV harus menghasilkan berkas di folder `laporan/` berisi blok detail + ringkasan yang sesuai periode.
 
 ### 11.2 Language Capability Testing
 
