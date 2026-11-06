@@ -1,0 +1,218 @@
+# tampilan/pengaturan.idk — Layar modul Pengaturan & Pemeliharaan (PRD §3.7).
+
+impor tampilan.dasar
+impor layanan.pengaturan
+dari inti.galat impor GalatValidasi, GalatData
+dari teks impor teks_ulang, teks_pangkas, teks_berisi
+
+fungsi baca_isian(petunjuk) {
+    variabel j = ""
+    coba {
+        j = input(petunjuk)
+    } kecuali Galat {
+        kembalikan kosong
+    }
+    jika j == kosong {
+        kembalikan kosong
+    }
+    kembalikan teks_pangkas(j)
+}
+
+fungsi baris_label(label, nilai) {
+    variabel t = "-"
+    jika nilai != kosong {
+        t = ke_teks(nilai)
+    }
+    kembalikan "  " + dasar.REDUP + dasar.kolom_kiri(label, 16) + dasar.RESET + ": " + t + "\n"
+}
+
+fungsi rangkai_menu(pesan) {
+    variabel b = "\n"
+    b = b + "  " + dasar.warna(dasar.kolom_kiri("PENGATURAN & PEMELIHARAAN", 34), dasar.TEBAL + dasar.TEKS) + "\n"
+    b = b + "  " + dasar.divider(42) + "\n\n"
+    variabel pilihan = [["1", "Informasi aplikasi"], ["2", "Informasi & ubah warung"], ["3", "Cadangkan database"], ["4", "Pulihkan dari cadangan"]]
+    untuk i dalam rentang(panjang(pilihan)) {
+        b = b + "  " + dasar.warna("[" + pilihan[i][0] + "]", dasar.NYALA) + " " + dasar.TEKS + pilihan[i][1] + dasar.RESET + "\n"
+    }
+    jika panjang(pesan) > 0 {
+        b = b + "\n  " + dasar.warna("! " + pesan, dasar.MERAH) + "\n"
+    }
+    b = b + "\n  " + dasar.REDUP + "[0-4] Pilih | [Enter] Konfirmasi | [0] Kembali" + dasar.RESET + "\n\n"
+    kembalikan b
+}
+
+fungsi tampilkan_info(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("INFORMASI APLIKASI", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel i = pengaturan.info_aplikasi(db)
+    variabel b = ""
+    b = b + baris_label("Nama aplikasi", i["nama_aplikasi"])
+    b = b + baris_label("Versi", i["versi"])
+    b = b + baris_label("Basis data", i["path_db"])
+    b = b + baris_label("Folder cadangan", i["path_cadangan"])
+    b = b + baris_label("Dibuat pada", i["dibuat_pada"])
+    b = b + "\n  " + dasar.REDUP + teks_ulang("-", 40) + dasar.RESET + "\n"
+    b = b + baris_label("Barang aktif", ke_teks(i["barang_aktif"]) + " dari " + ke_teks(i["barang_total"]))
+    b = b + baris_label("Pelanggan", i["pelanggan"])
+    b = b + baris_label("Transaksi", ke_teks(i["transaksi"]) + " (bon: " + ke_teks(i["bon"]) + ")")
+    cetak(b, akhir="")
+    dasar.dialog("Itu kondisi aplikasimu sekarang, Bos.")
+    kembalikan 0
+}
+
+fungsi tampilkan_warung(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("INFORMASI WARUNG", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel w = pengaturan.info_warung(db)
+    variabel b = ""
+    b = b + baris_label("Nama", w["nama"])
+    b = b + baris_label("Alamat", w["alamat"])
+    b = b + baris_label("Telepon", w["telepon"])
+    b = b + baris_label("Catatan struk", w["catatan"])
+    cetak(b + "\n", akhir="")
+    variabel jwb = baca_isian("  Ubah pengaturan warung? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Tidak diubah, Bos.")
+        kembalikan 0
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan 0
+    }
+    variabel baru = {}
+    variabel isian = baca_isian("  Nama warung   (Enter = tetap) : ")
+    jika isian != "" {
+        baru["nama"] = isian
+    } selain {
+        baru["nama"] = w["nama"]
+    }
+    isian = baca_isian("  Alamat        (Enter = tetap) : ")
+    jika isian != "" {
+        baru["alamat"] = isian
+    } selain {
+        baru["alamat"] = w["alamat"]
+    }
+    isian = baca_isian("  Telepon       (Enter = tetap) : ")
+    jika isian != "" {
+        baru["telepon"] = isian
+    } selain {
+        baru["telepon"] = w["telepon"]
+    }
+    isian = baca_isian("  Catatan struk (Enter = tetap) : ")
+    jika isian != "" {
+        baru["catatan"] = isian
+    } selain {
+        baru["catatan"] = w["catatan"]
+    }
+    jwb = baca_isian("  Simpan perubahan? [y/t] : ")
+    jika jwb == kosong atau jwb == "" atau huruf_besar(jwb) != "Y" {
+        dasar.dialog("Perubahan tidak jadi disimpan, Bos.")
+        kembalikan 0
+    }
+    pengaturan.simpan_warung(db, baru)
+    dasar.dialog("Pengaturan warung tersimpan, Bos!")
+    kembalikan 0
+}
+
+fungsi tampilkan_cadangkan(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("CADANGKAN DATABASE", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    cetak("  Database disalin utuh ke folder cadangan/\n", akhir="")
+    cetak("  dengan nama berstempel waktu. Aplikasi tetap\n", akhir="")
+    cetak("  berjalan selama proses berlangsung.\n\n", akhir="")
+    variabel jwb = baca_isian("  Jalankan cadangan sekarang? [y/t] : ")
+    jika jwb == kosong atau jwb == "" {
+        dasar.dialog("Cadangan dibatalkan, Bos.")
+        kembalikan 0
+    }
+    jika huruf_besar(jwb) != "Y" {
+        dasar.dialog("Tidak jadi ya, Bos.")
+        kembalikan 0
+    }
+    variabel hasil = pengaturan.cadangkan(db)
+    dasar.dialog("Cadangan tersimpan: " + hasil["path"] + ", Bos!")
+    kembalikan 0
+}
+
+fungsi tampilkan_pulihkan(db) {
+    dasar.bersihkan_layar()
+    cetak("\n  " + dasar.warna(dasar.kolom_kiri("PULIHKAN DATABASE", 34), dasar.TEBAL + dasar.TEKS) + "\n", akhir="")
+    cetak("  " + dasar.divider(42) + "\n\n", akhir="")
+    variabel daftar = pengaturan.daftar_cadangan()
+    jika panjang(daftar) == 0 {
+        dasar.dialog("Belum ada cadangan, Bos. Buat dulu lewat menu [3].")
+        kembalikan 0
+    }
+    variabel b = "  " + dasar.REDUP + "Pilih cadangan (terbaru di atas):" + dasar.RESET + "\n\n"
+    untuk i dalam rentang(panjang(daftar)) {
+        b = b + "  " + dasar.warna("[" + ke_teks(i + 1) + "]", dasar.NYALA) + " " + dasar.TEKS + daftar[i] + dasar.RESET + "\n"
+    }
+    b = b + "\n  " + dasar.warna("! Semua data saat ini akan DIGANTI isi cadangan.", dasar.MERAH) + "\n\n"
+    cetak(b, akhir="")
+    variabel jawab = baca_isian("  Nomor cadangan (0 = batal) : ")
+    jika jawab == kosong atau jawab == "" {
+        kembalikan 0
+    }
+    variabel no = 0
+    coba {
+        no = ke_bulat(ke_angka(jawab))
+    } kecuali Galat {
+        naikkan GalatValidasi("Itu bukan angka, Bos.")
+    }
+    jika no == 0 {
+        dasar.dialog("Pemulihan dibatalkan, Bos.")
+        kembalikan 0
+    }
+    jika no < 1 atau no > panjang(daftar) {
+        naikkan GalatValidasi("Nomornya antara 1 dan " + ke_teks(panjang(daftar)) + ", Bos.")
+    }
+    variabel nama = daftar[no - 1]
+    variabel jwb = baca_isian("  Pulihkan dari '" + nama + "'? [y/t] : ")
+    jika jwb == kosong atau jwb == "" atau huruf_besar(jwb) != "Y" {
+        dasar.dialog("Pemulihan dibatalkan, Bos.")
+        kembalikan 0
+    }
+    pengaturan.pulihkan(db, nama)
+    dasar.dialog("Data dipulihkan dari " + nama + ", Bos!")
+    kembalikan 0
+}
+
+fungsi jalankan(db) {
+    variabel berjalan = benar
+    variabel pesan = ""
+    selagi berjalan {
+        dasar.bersihkan_layar()
+        cetak(rangkai_menu(pesan), akhir="")
+        variabel p = dasar.baca_pilihan(4)
+        pesan = ""
+        jika p == -2 {
+            berjalan = salah
+        } jika_lain p == -3 {
+            pesan = ""
+        } jika_lain p == -1 {
+            pesan = "Ketik nomor menu dulu, Bos (0-4)."
+        } jika_lain p == 0 {
+            berjalan = salah
+        } selain {
+            coba {
+                jika p == 1 {
+                    tampilkan_info(db)
+                } jika_lain p == 2 {
+                    tampilkan_warung(db)
+                } jika_lain p == 3 {
+                    tampilkan_cadangkan(db)
+                } jika_lain p == 4 {
+                    tampilkan_pulihkan(db)
+                }
+            } kecuali GalatValidasi sebagai e {
+                dasar.dialog(e.pesan)
+            } kecuali GalatData sebagai e {
+                dasar.dialog(e.pesan)
+            }
+        }
+    }
+    kembalikan 0
+}

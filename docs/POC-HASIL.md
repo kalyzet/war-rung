@@ -35,6 +35,7 @@ Pendukung: `poc_bantuan.idk`, `poc_siklus_a.idk`, `poc_siklus_b.idk` (impor), `d
 - Kata kunci teramati: `dalam` (bukan `in` — `untuk x in ...` gagal parse), `kelas` (dilarang sebagai nama properti: `e.kelas` → "Harapkan nama properti setelah '.'"), `kasus` (dilarang sebagai nama variabel).
 - **`konstanta` BUKAN kata kunci deklarasi** — `konstanta K = 5` menghasilkan `Variabel tidak terdefinisi 'konstanta'` (exit 70; dari dalam modul: lihat §2.6 = senyap). Kunci deklarasi = **`variabel`**.
 - Kata kunci juga tidak sah sebagai segmen nama modul: `impor tidak.ada` → parse error 65 `[baris 1, kolom 7] Kesalahan di 'tidak': Harapkan nama modul.` (bukan masalah titiknya — `tidak` = operator).
+- **`bukan` BUKAN operator** (Fase 6): `jika bukan ada_berkas(x)` → parse error 65 `Harapkan ekspresi`. Penyangkalan logis = **`tidak`** unary (`tidak salah` → `benar`) atau idiom pembanding **`== salah`** (dipakai aplikasi).
 - Klausa `kecuali Tipe {...}` tanpa `sebagai x` harus menjadi klausa TERAKHIR; selain itu wajib `kecuali Tipe sebagai x` (compile error bila tidak).
 - `lanjut` (continue) dan `hentikan` (break) adalah **kata kunci perulangan** — `lanjut` DILARANG sebagai nama variabel (`variabel lanjut` → parse error 65 "Harapkan nama variabel"). `lanjutkan(it[, bawaan])` = fungsi bawaan iterator next() (dinamai begitu karena `lanjut` sudah keyword — CHANGELOG).
 - Rantai cabang: `jika k1 { } jika_lain k2 { } selain { }` — **`jika_lain` WAJIB punya kondisi**; else telanjang = **`selain`**. `} jika_lain {` tanpa kondisi membuat `{` dibaca ekspresi dict → galat menipu: "Harapkan ':' setelah kunci kamus".
@@ -79,6 +80,7 @@ Pendukung: `poc_bantuan.idk`, `poc_siklus_a.idk`, `poc_siklus_b.idk` (impor), `d
   - `db_komit`/`db_batal` tanpa transaksi aktif
   - Operasi pada handle tertutup
 - `db_tutup` dua kali aman. `db_baris_terpengaruh`/`db_id_terakhir` berfungsi.
+- **Backup/pulih via SQL jalan penuh (Fase 6):** `db_eksekusi(db, "VACUUM INTO ?", [path])` (snapshot konsisten), `ATTACH DATABASE ? AS bak` + `DETACH DATABASE bak` (detached dua kali aman), salin antar-database dengan `INSERT INTO main.t (kolom) SELECT kolom FROM bak.t`. `PRAGMA foreign_keys` = no-op di dalam transaksi aktif → wajib diatur sebelum `db_mulai`.
 - Pesan galat sqlite dipertahankan apa adanya (asli Inggris) → layer layanan menerjemahkan ke pesan ramah ala `DESIGN.md` §6.
 
 ### 2.6 Modul & impor (diverifikasi ulang — lengkap)

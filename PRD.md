@@ -519,7 +519,7 @@ Aktivitas:
 - Penyempurnaan dokumentasi.
 - Persiapan release.
 
-Hasil: War-Rung versi 1.0.0.
+Hasil: War-Rung versi 1.0.0 — **selesai** (modul Pengaturan & Pemeliharaan: info aplikasi, info/ubah warung, cadangkan `VACUUM INTO`, pulihkan atomik; uji pengaturan 5/5 + integritas 6/6; seluruh uji 59/59 lulus, periksa 0 temuan, skenario aplikasi end-to-end lulus; dokumentasi instalasi & penggunaan di `README.md`).
 
 ## 11. Pengujian
 
@@ -542,6 +542,8 @@ Skenario pengujian:
 - Laporan harian/mingguan/bulanan harus mengecualikan transaksi berstatus batal.
 - Rentang laporan: awal inklusif, akhir eksklusif (harian = hari ini, mingguan = Senin–minggu berjalan, bulanan = bulan berjalan).
 - Ekspor CSV harus menghasilkan berkas di folder `laporan/` berisi blok detail + ringkasan yang sesuai periode.
+- Cadangan database harus menghasilkan berkas yang bisa dipulihkan kembali (uji segitiga: data sebelum cadangan balik, data sesudah cadangan hilang).
+- Pemulihan dari berkas yang bukan cadangan War-Rung harus ditolak dengan pesan ramah tanpa merusak database.
 
 ### 11.2 Language Capability Testing
 
@@ -626,4 +628,4 @@ Selain menghasilkan aplikasi yang berfungsi, proyek ini diharapkan memberikan ga
 **Dokumen:** PRD.md  
 **Proyek:** War-Rung  
 **Versi Dokumen:** 1.1.0  
-**Status:** Draft — Fase 0–5 selesai (PoC, fondasi, barang, kasir, stok & piutang, laporan; seluruh uji 48/48 lulus, periksa 0 temuan, skenario aplikasi lulus); menuju Fase 6 (Testing and Release)
+**Status:** Final — Fase 0–6 selesai, War-Rung versi 1.0.0 (seluruh uji 59/59 lulus, periksa 0 temuan, skenario aplikasi lulus, dokumentasi `README.md` tersedia)

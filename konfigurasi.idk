@@ -3,7 +3,7 @@
 # pengaturan (PRD §6.7), bukan di berkas ini.
 
 variabel NAMA_APLIKASI = "War-Rung"
-variabel VERSI = "0.1.0"
+variabel VERSI = "1.0.0"
 variabel PATH_DB = "data/War-Rung.db"
 variabel PATH_SKEMA = "basis_data/skema.sql"
 variabel PATH_CADANGAN = "cadangan"

@@ -10,6 +10,7 @@ impor tampilan.barang
 impor tampilan.kasir
 impor tampilan.pelanggan
 impor tampilan.laporan
+impor tampilan.pengaturan
 impor inti.papan
 dari teks impor teks_ulang
 
@@ -79,7 +80,7 @@ fungsi aplikasi() {
             } jika_lain p == 4 {
                 laporan.jalankan(db)
             } selain {
-                dasar.dialog("Modul " + PILIHAN[p - 1] + " menyusul di fase berikutnya, Bos.")
+                pengaturan.jalankan(db)
             }
         }
     }

@@ -127,6 +127,13 @@ Jika stok menipis saat kasir memasukkan barang, muncul **dialog inline** bergaya
 - **Tata letak layar ringkasan:** baris label lebar 19 kolom (Periode, Total transaksi, Total omzet, Estimasi laba kotor, Piutang berjalan) → blok "Barang Terlaris" (No/Nama/Jml/Omzet) → blok "Daftar Transaksi" (kode/tanggal/total/status; status lunas hijau, bon kuning); mingguan/bulanan menambah "Rekap per Hari".
 - **Ekspor:** submenu `[1-3]` menulis CSV ke folder `laporan/` (nama `laporan-<jenis>-<awal>-<akhir>.csv`), konfirmasi via dialog "Tersimpan: laporan/...".
 
+### 5.6. Modul Pengaturan & Pemeliharaan
+
+- **Menu:** `[1]` Informasi aplikasi, `[2]` Informasi & ubah warung, `[3]` Cadangkan database, `[4]` Pulihkan dari cadangan, `[0]` Kembali.
+- **Tata letak:** baris label lebar 16 kolom (konsisten dengan layar ringkasan laporan); operasi berisiko (cadangkan/pulihkan) selalu diawali pertanyaan `[y/t]` dan diakhiri dialog panel 3D.
+- **Form ubah warung:** nilai sekarang ditampilkan dulu, lalu tiap isian memakai pola `Enter = tetap` (isian kosong mempertahankan nilai lama); nama warung wajib terisi.
+- **Pulihkan:** daftar cadangan ditampilkan terbaru-di-atas dengan nomor `[1..n]`; konfirmasi eksplisit menyebutkan bahwa **semua data saat ini akan diganti** — pesan penolakan (berkas bukan cadangan/hilang) tampil sebagai dialog ramah tanpa mengubah database.
+
 ## 6. Aksesibilitas & Ramah Pengguna
 
 1. **Bahasa Manusia (Human-Centric Copywriting):**

@@ -1,7 +1,9 @@
 # inti/koneksi.idk — Satu-satunya tempat memanggil db_buka/db_tutup.
 # Lapisan lain meminta koneksi lewat fungsi di sini; SQL selalu memakai ?.
+# Termasuk cadangan/pemulihan database (PRD §3.7).
 
 impor konfigurasi
+dari inti.galat impor GalatValidasi
 dari teks impor teks_pisah, teks_pangkas
 
 fungsi buka_db() {
@@ -40,4 +42,126 @@ fungsi siapkan_skema(db) {
 
 fungsi tutup_db(db) {
     db_tutup(db)
+}
+
+# --- Cadangan & pemulihan (PRD §3.7, DoD) ---
+
+# VACUUM INTO = snapshot konsisten walau transaksi sedang berjalan.
+# Hasil diverifikasi dengan membuka ulang; berkas rusak dibuang lagi.
+fungsi cadangkan_db(db) {
+    coba {
+        isi_direktori(konfigurasi.PATH_CADANGAN)
+    } kecuali Galat {
+        buat_direktori(konfigurasi.PATH_CADANGAN)
+    }
+    variabel stempel = format_tanggal("%Y-%m-%d-%H%M%S")
+    variabel nama = "War-Rung-" + stempel + ".db"
+    variabel langkah = 2
+    selagi ada_berkas(konfigurasi.PATH_CADANGAN + "/" + nama) {
+        nama = "War-Rung-" + stempel + "-" + ke_teks(langkah) + ".db"
+        langkah = langkah + 1
+    }
+    variabel path = konfigurasi.PATH_CADANGAN + "/" + nama
+    db_eksekusi(db, "VACUUM INTO ?", [path])
+    variabel uji = kosong
+    variabel n_tabel = -1
+    coba {
+        uji = db_buka(path)
+        variabel cek = db_ambil_satu(uji, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'barang'")
+        n_tabel = cek["n"]
+        db_tutup(uji)
+    } kecuali Galat sebagai e {
+        jika uji != kosong {
+            coba { db_tutup(uji) } kecuali Galat { }
+        }
+        coba { hapus_berkas(path) } kecuali Galat { }
+        naikkan GalatValidasi("Gagal memverifikasi cadangan (" + e.pesan + "), Bos.")
+    }
+    jika n_tabel != 1 {
+        coba { hapus_berkas(path) } kecuali Galat { }
+        naikkan GalatValidasi("Hasil cadangan tidak valid, Bos.")
+    }
+    kembalikan nama
+}
+
+# Buka cadangan sebentar hanya untuk memastikan itu SQLite War-Rung yang utuh.
+fungsi periksa_cadangan(path) {
+    jika ada_berkas(path) == salah {
+        naikkan GalatValidasi("Berkas cadangan tidak ketemu, Bos.")
+    }
+    variabel uji = kosong
+    coba {
+        uji = db_buka(path)
+        variabel cek = db_ambil_satu(uji, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'barang'")
+        db_tutup(uji)
+        uji = kosong
+        jika cek["n"] != 1 {
+            naikkan GalatValidasi("Itu bukan berkas cadangan War-Rung, Bos.")
+        }
+    } kecuali GalatValidasi sebagai e {
+        naikkan e
+    } kecuali Galat sebagai e {
+        jika uji != kosong {
+            coba { db_tutup(uji) } kecuali Galat { }
+        }
+        naikkan GalatValidasi("Berkas cadangan tidak bisa dibaca (" + e.pesan + "), Bos.")
+    }
+    kembalikan 1
+}
+
+# Ganti SELURUH isi database aktif dengan isi cadangan (atomik):
+# foreign_keys dimatikan dulu (PRAGMA di dalam transaksi = no-op),
+# semua tabel dihapus + disalin ulang dari cadangan, lalu dikomit.
+fungsi pulihkan_db(db, path) {
+    periksa_cadangan(path)
+    db_eksekusi(db, "PRAGMA foreign_keys = OFF")
+    variabel terlampir = salah
+    coba {
+        db_eksekusi(db, "ATTACH DATABASE ? AS bak", [path])
+        terlampir = benar
+        db_mulai(db)
+        salin_dari_cadangan(db)
+        db_komit(db)
+    } kecuali Galat sebagai e {
+        coba { db_batal(db) } kecuali Galat { }
+        jika terlampir {
+            coba { db_eksekusi(db, "DETACH DATABASE bak") } kecuali Galat { }
+        }
+        db_eksekusi(db, "PRAGMA foreign_keys = ON")
+        naikkan e
+    }
+    db_eksekusi(db, "DETACH DATABASE bak")
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan 1
+}
+
+# Disalin per kolom eksplisit supaya urutan kolom yang berbeda pun aman.
+fungsi salin_dari_cadangan(db) {
+    variabel tabel = db_ambil_semua(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+    untuk baris dalam tabel {
+        variabel t = baris["name"]
+        variabel ada = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM bak.sqlite_master WHERE type = 'table' AND name = ?", [t])
+        jika ada["n"] != 1 {
+            naikkan GalatValidasi("Cadangan tidak kompatibel — tabel '" + t + "' tidak ada di sana, Bos.")
+        }
+        variabel kolom = db_ambil_semua(db, "PRAGMA table_info(\"" + t + "\")")
+        variabel daftar_kolom = ""
+        untuk k dalam kolom {
+            jika panjang(daftar_kolom) > 0 {
+                daftar_kolom = daftar_kolom + ", "
+            }
+            daftar_kolom = daftar_kolom + "\"" + k["name"] + "\""
+        }
+        db_eksekusi(db, "DELETE FROM \"" + t + "\"")
+        db_eksekusi(db, "INSERT INTO \"" + t + "\" (" + daftar_kolom + ") SELECT " + daftar_kolom + " FROM bak.\"" + t + "\"")
+    }
+    # Nomor AUTOINCREMENT: pakai punya cadangan bila ada, bersihkan bila tidak.
+    variabel seq_bak = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM bak.sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'")
+    variabel seq_main = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'")
+    jika seq_main["n"] == 1 {
+        db_eksekusi(db, "DELETE FROM sqlite_sequence")
+        jika seq_bak["n"] == 1 {
+            db_eksekusi(db, "INSERT INTO sqlite_sequence (name, seq) SELECT name, seq FROM bak.sqlite_sequence")
+        }
+    }
 }

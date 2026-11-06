@@ -1,0 +1,163 @@
+# uji_pengaturan.idk — Uji otomatis Fase 6 (Pengaturan & Pemeliharaan, PRD §3.7).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_pengaturan.idk     (exit 0 = lulus, 1 = gagal)
+# Semua uji memakai database :memory: — tidak menyentuh data/War-Rung.db.
+
+dari inti.galat impor GalatValidasi, GalatData
+impor konfigurasi
+impor inti.koneksi
+impor basis_data.seed
+impor layanan.pengaturan
+dari teks impor teks_berisi, teks_pangkas
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    seed.jika_kosong(db)
+    kembalikan db
+}
+
+fungsi nilai_pengaturan(db, kunci) {
+    variabel baris = db_ambil_satu(db, "SELECT nilai FROM pengaturan WHERE kunci = ?", [kunci])
+    kembalikan baris["nilai"]
+}
+
+fungsi bersihkan_cadangan(nama) {
+    coba {
+        hapus_berkas(konfigurasi.PATH_CADANGAN + "/" + nama)
+    } kecuali Galat {
+        # berkas memang belum terbentuk — abaikan
+    }
+}
+
+fungsi uji_cadangan_dan_daftar() {
+    variabel db = db_segar()
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-CAD', 'Barang Cadangan', 1000, 1500, 3, 1)", [])
+    variabel hasil = pengaturan.cadangkan(db)
+    pastikan teks_berisi(hasil["nama"], "War-Rung-"), "nama cadangan berstempel War-Rung"
+    pastikan teks_berisi(hasil["nama"], ".db"), "ekstensi .db"
+    pastikan ada_berkas(hasil["path"]), "berkas cadangan benar-benar terbentuk"
+    variabel daftar = pengaturan.daftar_cadangan()
+    pastikan panjang(daftar) >= 1, "daftar cadangan minimal berisi 1"
+    variabel ketemu = salah
+    untuk nama dalam daftar {
+        jika nama == hasil["nama"] {
+            ketemu = benar
+        }
+    }
+    pastikan ketemu, "cadangan yang baru dibuat masuk daftar"
+    # berkas non-.db tidak ikut terdaftar
+    variabel sampah = konfigurasi.PATH_CADANGAN + "/catatan.txt"
+    tulis_semua(sampah, "bukan database")
+    untuk nama dalam pengaturan.daftar_cadangan() {
+        pastikan teks_berisi(nama, ".db"), "hanya .db yang terdaftar: " + nama
+    }
+    hapus_berkas(sampah)
+    bersihkan_cadangan(hasil["nama"])
+    db_tutup(db)
+}
+
+fungsi uji_info_aplikasi() {
+    variabel db = db_segar()
+    variabel i = pengaturan.info_aplikasi(db)
+    pastikan i["nama_aplikasi"] == "War-Rung", "nama aplikasi dari konfigurasi"
+    pastikan i["versi"] == konfigurasi.VERSI, "versi mengikuti konfigurasi"
+    pastikan i["path_db"] == "data/War-Rung.db", "path DB sesuai PRD"
+    pastikan i["path_cadangan"] == "cadangan", "folder cadangan sesuai PRD"
+    pastikan i["dibuat_pada"] != kosong, "dibuat_pada terisi seed"
+    pastikan i["barang_total"] >= 0, "hitung barang terbaca"
+    pastikan i["pelanggan"] >= 0, "hitung pelanggan terbaca"
+    pastikan i["transaksi"] >= 0, "hitung transaksi terbaca"
+    pastikan i["bon"] >= 0, "hitung bon terbaca"
+    db_tutup(db)
+}
+
+fungsi uji_pulihkan_segitiga() {
+    variabel db = db_segar()
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-AWAL', 'Barang Awal', 1000, 2000, 5, 1)", [])
+    variabel hasil = pengaturan.cadangkan(db)
+    # perubahan SESUDAH cadangan — harus hilang setelah pemulihan
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-SESUDAH', 'Barang Sesudah', 2000, 3000, 7, 1)", [])
+    variabel sesudah = db_ambil_semua(db, "SELECT id FROM barang WHERE sku = 'SKU-SESUDAH'")
+    pastikan panjang(sesudah) == 1, "pre-kondisi: barang sesudah cadangan ada"
+    pengaturan.pulihkan(db, hasil["nama"])
+    variabel hilang = db_ambil_semua(db, "SELECT id FROM barang WHERE sku = 'SKU-SESUDAH'")
+    pastikan panjang(hilang) == 0, "data sesudah cadangan hilang setelah pulihkan"
+    variabel balik = db_ambil_semua(db, "SELECT id FROM barang WHERE sku = 'SKU-AWAL'")
+    pastikan panjang(balik) == 1, "data sebelum cadangan kembali utuh"
+    variabel fk = db_ambil_satu(db, "PRAGMA foreign_keys")
+    pastikan fk["foreign_keys"] == 1, "foreign_keys tetap ON setelah pulihkan"
+    # AUTOINCREMENT lanjut dari angka cadangan, bukan dari baris yang sudah dihapus
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-BARU', 'Barang Baru', 500, 700, 2, 1)", [])
+    variabel baru = db_ambil_satu(db, "SELECT id FROM barang WHERE sku = 'SKU-BARU'")
+    variabel awal = db_ambil_satu(db, "SELECT id FROM barang WHERE sku = 'SKU-AWAL'")
+    pastikan baru["id"] == awal["id"] + 1, "AUTOINCREMENT lanjut tepat setelah cadangan"
+    # database tetap bisa dipakai menulis setelah pemulihan
+    db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES ('uji_pulih', '1')", [])
+    pastikan nilai_pengaturan(db, "uji_pulih") == "1", "tulisan sesudah pulihkan berhasil"
+    bersihkan_cadangan(hasil["nama"])
+    db_tutup(db)
+}
+
+fungsi uji_pulihkan_tolak_sampah() {
+    variabel db = db_segar()
+    coba {
+        isi_direktori(konfigurasi.PATH_CADANGAN)
+    } kecuali Galat {
+        buat_direktori(konfigurasi.PATH_CADANGAN)
+    }
+    # berkas yang bukan SQLite
+    variabel path = konfigurasi.PATH_CADANGAN + "/uji-sampah.db"
+    tulis_semua(path, "ini bukan sqlite sama sekali")
+    variabel pesan = ""
+    coba {
+        pengaturan.pulihkan(db, "uji-sampah.db")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan panjang(pesan) > 0, "cadangan sampah ditolak GalatValidasi"
+    pastikan teks_berisi(pesan, "bisa dibaca") atau teks_berisi(pesan, "bukan berkas"), "pesan penolakan ramah"
+    hapus_berkas(path)
+    # berkas yang tidak ada
+    pesan = ""
+    coba {
+        pengaturan.pulihkan(db, "tidak-ada.db")
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan teks_berisi(pesan, "tidak ketemu"), "cadangan hilang ditolak dengan jelas"
+    # database masih sehat sesudah dua penolakan
+    variabel fk = db_ambil_satu(db, "PRAGMA foreign_keys")
+    pastikan fk["foreign_keys"] == 1, "foreign_keys tetap ON setelah penolakan"
+    db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES ('uji_tolak', '1')", [])
+    pastikan nilai_pengaturan(db, "uji_tolak") == "1", "database tetap bisa ditulis"
+    db_tutup(db)
+}
+
+fungsi uji_warung_simpan_baca() {
+    variabel db = db_segar()
+    variabel w0 = pengaturan.info_warung(db)
+    pastikan panjang(teks_pangkas(ke_teks(w0["nama"]))) > 0, "nama warung default terisi seed"
+    pengaturan.simpan_warung(db, {
+        "nama": "Warung Uji",
+        "alamat": "Jl. Uji No. 9",
+        "telepon": "0812000000",
+        "catatan": "Sampai jumpa lagi!"
+    })
+    variabel w1 = pengaturan.info_warung(db)
+    pastikan w1["nama"] == "Warung Uji", "nama warung tersimpan"
+    pastikan w1["alamat"] == "Jl. Uji No. 9", "alamat tersimpan"
+    pastikan w1["telepon"] == "0812000000", "telepon tersimpan"
+    pastikan w1["catatan"] == "Sampai jumpa lagi!", "catatan struk tersimpan"
+    # nama kosong ditolak sebelum menyentuh data
+    variabel pesan = ""
+    coba {
+        pengaturan.simpan_warung(db, {"nama": "   ", "alamat": "x", "telepon": "y", "catatan": "z"})
+    } kecuali GalatValidasi sebagai e {
+        pesan = e.pesan
+    }
+    pastikan teks_berisi(pesan, "kosong"), "nama kosong ditolak dengan pesan ramah"
+    pastikan pengaturan.info_warung(db)["nama"] == "Warung Uji", "gagal simpan tidak mengubah data"
+    db_tutup(db)
+}

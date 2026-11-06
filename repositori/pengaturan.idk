@@ -1,0 +1,28 @@
+# repositori/pengaturan.idk — Akses tabel pengaturan (PRD §6.7).
+# Kunci yang dipakai: nama_warung, alamat_warung, telepon_warung,
+# catatan_struk, dibuat_pada (diisi basis_data/seed.idk).
+
+fungsi ambil(db, kunci) {
+    variabel baris = db_ambil_satu(db, "SELECT nilai FROM pengaturan WHERE kunci = ?", [kunci])
+    jika baris == kosong {
+        kembalikan kosong
+    }
+    kembalikan baris["nilai"]
+}
+
+fungsi semua(db) {
+    kembalikan db_ambil_semua(db, "SELECT kunci, nilai FROM pengaturan")
+}
+
+fungsi ubah(db, kunci, nilai) {
+    db_eksekusi(db, "UPDATE pengaturan SET nilai = ? WHERE kunci = ?", [nilai, kunci])
+    jika db_baris_terpengaruh(db) == 0 {
+        db_eksekusi(db, "INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)", [kunci, nilai])
+    }
+    kembalikan 1
+}
+
+# Satu baris ringkas untuk layar Informasi Aplikasi.
+fungsi hitung(db) {
+    kembalikan db_ambil_satu(db, "SELECT (SELECT COUNT(*) FROM barang WHERE aktif = 1) AS barang_aktif, (SELECT COUNT(*) FROM barang) AS barang_total, (SELECT COUNT(*) FROM pelanggan) AS pelanggan, (SELECT COUNT(*) FROM transaksi) AS transaksi, (SELECT COUNT(*) FROM transaksi WHERE status = 'bon') AS bon")
+}

@@ -1,0 +1,170 @@
+# uji_integritas.idk — Uji otomatis Fase 6 (integritas database, PRD §4.2–4.3, §11.1).
+# Jalankan dari akar proyek dengan INDK_PATH terpasang:
+#   indk uji pengujian/uji_integritas.idk     (exit 0 = lulus, 1 = gagal)
+# Semua uji memakai database :memory: — tidak menyentuh data/War-Rung.db.
+
+dari inti.galat impor GalatValidasi, GalatData
+impor inti.koneksi
+
+fungsi db_segar() {
+    variabel db = db_buka(":memory:")
+    koneksi.siapkan_skema(db)
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    kembalikan db
+}
+
+fungsi uji_check_barang() {
+    variabel db = db_segar()
+    # harga beli negatif — CHECK (harga_beli >= 0)
+    coba {
+        db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-NEG', 'Negatif', -1, 1000, 1, 1)", [])
+        pastikan salah, "harga beli negatif harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    # stok negatif — CHECK (stok >= 0)
+    coba {
+        db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-STOK', 'StokNeg', 100, 200, -5, 1)", [])
+        pastikan salah, "stok negatif harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    # SKU unik
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-SAMA', 'Pertama', 100, 200, 1, 1)", [])
+    coba {
+        db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-SAMA', 'Kedua', 100, 200, 1, 1)", [])
+        pastikan salah, "SKU kembar harus ditolak UNIQUE"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    variabel n = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM barang WHERE sku = 'SKU-SAMA'")
+    pastikan n["n"] == 1, "hanya satu baris SKU-SAMA yang masuk"
+    db_tutup(db)
+}
+
+fungsi uji_check_transaksi() {
+    variabel db = db_segar()
+    # status di luar lunas|bon|batal
+    coba {
+        db_eksekusi(db, "INSERT INTO transaksi (kode, tanggal, subtotal, total, status) VALUES ('TRX-X', '2026-01-01', 100, 100, 'aneh')", [])
+        pastikan salah, "status aneh harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    # total negatif
+    coba {
+        db_eksekusi(db, "INSERT INTO transaksi (kode, tanggal, subtotal, total, status) VALUES ('TRX-Y', '2026-01-01', -5, -5, 'lunas')", [])
+        pastikan salah, "total negatif harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    # kode unik
+    db_eksekusi(db, "INSERT INTO transaksi (kode, tanggal, subtotal, total, status) VALUES ('TRX-UNIK', '2026-01-01', 10, 10, 'lunas')", [])
+    coba {
+        db_eksekusi(db, "INSERT INTO transaksi (kode, tanggal, subtotal, total, status) VALUES ('TRX-UNIK', '2026-01-02', 10, 10, 'lunas')", [])
+        pastikan salah, "kode transaksi kembar harus ditolak UNIQUE"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    db_tutup(db)
+}
+
+fungsi uji_fk_detail_yatim() {
+    variabel db = db_segar()
+    # transaksi_id yang tidak ada
+    coba {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (9999, 1, 'Yatim', 100, 50, 1, 100)", [])
+        pastikan salah, "detail tanpa transaksi harus ditolak FK"
+    } kecuali GalatNilai {
+        # ditolak foreign key — diharapkan
+    }
+    # barang_id yang tidak ada
+    coba {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (1, 9999, 'Yatim', 100, 50, 1, 100)", [])
+        pastikan salah, "detail tanpa barang harus ditolak FK"
+    } kecuali GalatNilai {
+        # ditolak foreign key — diharapkan
+    }
+    # jumlah nol — CHECK (jumlah > 0)
+    coba {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (1, 1, 'Nol', 100, 50, 0, 0)", [])
+        pastikan salah, "jumlah 0 harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    variabel n = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM detail_transaksi")
+    pastikan n["n"] == 0, "tidak ada baris yatim yang tersimpan"
+    db_tutup(db)
+}
+
+fungsi uji_fk_bon_dan_riwayat() {
+    variabel db = db_segar()
+    # pembayaran_bon tanpa transaksi
+    coba {
+        db_eksekusi(db, "INSERT INTO pembayaran_bon (transaksi_id, jumlah, tanggal) VALUES (9999, 5000, '2026-01-01')", [])
+        pastikan salah, "cicilan tanpa transaksi harus ditolak FK"
+    } kecuali GalatNilai {
+        # ditolak foreign key — diharapkan
+    }
+    # pembayaran_bon jumlah nol/negatif — CHECK (jumlah > 0)
+    coba {
+        db_eksekusi(db, "INSERT INTO pembayaran_bon (transaksi_id, jumlah, tanggal) VALUES (1, 0, '2026-01-01')", [])
+        pastikan salah, "cicilan 0 harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    # riwayat_stok tanpa barang
+    coba {
+        db_eksekusi(db, "INSERT INTO riwayat_stok (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, tanggal) VALUES (9999, 'masuk', 1, 0, 1, '2026-01-01')", [])
+        pastikan salah, "riwayat tanpa barang harus ditolak FK"
+    } kecuali GalatNilai {
+        # ditolak foreign key — diharapkan
+    }
+    # riwayat stok_sesudah negatif — CHECK
+    coba {
+        db_eksekusi(db, "INSERT INTO riwayat_stok (barang_id, jenis, jumlah, stok_sebelum, stok_sesudah, tanggal) VALUES (1, 'keluar', 1, 0, -1, '2026-01-01')", [])
+        pastikan salah, "stok_sesudah negatif harus ditolak CHECK"
+    } kecuali GalatNilai {
+        # ditolak constraint — diharapkan
+    }
+    db_tutup(db)
+}
+
+fungsi uji_rollback_atomik() {
+    variabel db = db_segar()
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-RBK', 'Rollback', 100, 200, 5, 1)", [])
+    variabel sebelum = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM barang")
+    db_mulai(db)
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-DALAM', 'Dalam Transaksi', 100, 200, 5, 1)", [])
+    variabel saat = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM barang")
+    pastikan saat["n"] == sebelum["n"] + 1, "baris terlihat di dalam transaksi aktif"
+    db_batal(db)
+    variabel sesudah = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM barang")
+    pastikan sesudah["n"] == sebelum["n"], "rollback menghapus seluruh perubahan transaksi"
+    # sesudah rollback database tetap sehat dan bisa menulis lagi
+    db_eksekusi(db, "INSERT INTO barang (sku, nama, harga_beli, harga_jual, stok, stok_minimum) VALUES ('SKU-LAGI', 'Tulis Lagi', 100, 200, 5, 1)", [])
+    variabel akhir = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM barang")
+    pastikan akhir["n"] == sebelum["n"] + 1, "tulisan sesudah rollback berhasil"
+    db_tutup(db)
+}
+
+fungsi uji_foreign_keys_aktif() {
+    variabel db = db_segar()
+    variabel fk = db_ambil_satu(db, "PRAGMA foreign_keys")
+    pastikan fk["foreign_keys"] == 1, "PRAGMA foreign_keys = ON sejak awal koneksi"
+    # walaupun dimatikan sesaat lalu dinyalakan lagi, penolakan FK berlaku lagi
+    db_eksekusi(db, "PRAGMA foreign_keys = OFF")
+    db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (9999, 1, 'Sementara', 100, 50, 1, 100)", [])
+    db_eksekusi(db, "PRAGMA foreign_keys = ON")
+    coba {
+        db_eksekusi(db, "INSERT INTO detail_transaksi (transaksi_id, barang_id, nama_barang, harga_satuan, harga_beli, jumlah, subtotal) VALUES (9998, 1, 'Sekarang', 100, 50, 1, 100)", [])
+        pastikan salah, "FK berlaku lagi setelah dinyalakan"
+    } kecuali GalatNilai {
+        # ditolak foreign key — diharapkan
+    }
+    # bersih-bersih baris uji (FK sempat dimatikan)
+    db_eksekusi(db, "DELETE FROM detail_transaksi WHERE transaksi_id = 9999", [])
+    variabel n = db_ambil_satu(db, "SELECT COUNT(*) AS n FROM detail_transaksi")
+    pastikan n["n"] == 0, "tidak ada sisa baris uji"
+    db_tutup(db)
+}

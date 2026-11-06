@@ -1,0 +1,98 @@
+# layanan/pengaturan.idk — Aturan bisnis pengaturan & pemeliharaan (PRD §3.7).
+
+impor konfigurasi
+impor inti.koneksi
+impor repositori.pengaturan
+dari inti.galat impor GalatValidasi, GalatData
+dari inti.pesan impor terjemah_db
+dari teks impor teks_pangkas, teks_berisi
+
+fungsi info_aplikasi(db) {
+    variabel hitung = pengaturan.hitung(db)
+    kembalikan {
+        "nama_aplikasi": konfigurasi.NAMA_APLIKASI,
+        "versi": konfigurasi.VERSI,
+        "path_db": konfigurasi.PATH_DB,
+        "path_cadangan": konfigurasi.PATH_CADANGAN,
+        "dibuat_pada": pengaturan.ambil(db, "dibuat_pada"),
+        "barang_aktif": hitung["barang_aktif"],
+        "barang_total": hitung["barang_total"],
+        "pelanggan": hitung["pelanggan"],
+        "transaksi": hitung["transaksi"],
+        "bon": hitung["bon"]
+    }
+}
+
+fungsi info_warung(db) {
+    kembalikan {
+        "nama": pengaturan.ambil(db, "nama_warung"),
+        "alamat": pengaturan.ambil(db, "alamat_warung"),
+        "telepon": pengaturan.ambil(db, "telepon_warung"),
+        "catatan": pengaturan.ambil(db, "catatan_struk")
+    }
+}
+
+fungsi simpan_warung(db, data) {
+    variabel nama = teks_pangkas(data["nama"])
+    jika panjang(nama) == 0 {
+        naikkan GalatValidasi("Nama warung jangan kosong, Bos.")
+    }
+    coba {
+        db_mulai(db)
+        pengaturan.ubah(db, "nama_warung", nama)
+        pengaturan.ubah(db, "alamat_warung", teks_pangkas(data["alamat"]))
+        pengaturan.ubah(db, "telepon_warung", teks_pangkas(data["telepon"]))
+        pengaturan.ubah(db, "catatan_struk", teks_pangkas(data["catatan"]))
+        db_komit(db)
+    } kecuali GalatNilai sebagai e {
+        coba { db_batal(db) } kecuali Galat { }
+        naikkan GalatValidasi(terjemah_db(e, "menyimpan pengaturan warung"))
+    }
+    kembalikan 1
+}
+
+# Terbaru dulu (nama berkas berstempel waktu → urut-naik = tertua).
+fungsi daftar_cadangan() {
+    variabel isi = []
+    coba {
+        isi = isi_direktori(konfigurasi.PATH_CADANGAN)
+    } kecuali Galat {
+        kembalikan []
+    }
+    variabel saring = []
+    untuk nama dalam isi {
+        jika teks_berisi(nama, ".db") {
+            tambah(saring, nama)
+        }
+    }
+    variabel hasil = []
+    variabel n = panjang(saring)
+    untuk i dalam rentang(n) {
+        tambah(hasil, saring[n - 1 - i])
+    }
+    kembalikan hasil
+}
+
+fungsi cadangkan(db) {
+    variabel nama = koneksi.cadangkan_db(db)
+    kembalikan {
+        "nama": nama,
+        "path": konfigurasi.PATH_CADANGAN + "/" + nama
+    }
+}
+
+fungsi pulihkan(db, nama) {
+    variabel bersih = teks_pangkas(nama)
+    jika panjang(bersih) == 0 atau teks_berisi(bersih, ".db") == salah {
+        naikkan GalatValidasi("Pilih dulu nomor cadangannya, Bos.")
+    }
+    variabel path = konfigurasi.PATH_CADANGAN + "/" + bersih
+    coba {
+        koneksi.pulihkan_db(db, path)
+    } kecuali GalatValidasi sebagai e {
+        naikkan e
+    } kecuali GalatNilai sebagai e {
+        naikkan GalatValidasi("Gagal memulihkan (" + e.pesan + "), Bos.")
+    }
+    kembalikan 1
+}
