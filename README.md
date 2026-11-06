@@ -17,10 +17,12 @@ Dari akar proyek:
 warung.cmd
 ```
 
-Skrip `warung.cmd` menyiapkan `INDK_PATH` lalu menjalankan `utama.idk`.
-Alternatif manual (dari akar proyek):
+Skrip `warung.cmd` menyiapkan `INDK_PATH`, mengaktifkan kode halaman UTF-8
+(`chcp 65001`) supaya motif kotak & divider tampil benar, lalu menjalankan
+`utama.idk`. Alternatif manual (dari akar proyek):
 
 ```bat
+chcp 65001 >nul
 set INDK_PATH=%CD%
 .tools\indk\indk-windows\indk.exe utama.idk
 ```
@@ -30,13 +32,13 @@ Database otomatis dibuat di `data/War-Rung.db` saat pertama dijalankan
 
 ## Menu Utama
 
-| No | Menu | Isi |
-| -- | ---- | --- |
-| 1 | Masuk ke Kasir | Meja transaksi: cari barang, jumlah, diskon, tunai/bon, struk |
-| 2 | Kelola Barang | Daftar/cari/tambah/ubah/nonaktif/hapus barang, stok masuk, penyesuaian, riwayat, stok menipis |
-| 3 | Pelanggan & Piutang | Daftar/cari/tambah/ubah pelanggan, detail & riwayat, Buku Kas (bon), bayar cicilan |
-| 4 | Laporan Penjualan | Harian/mingguan/bulanan, barang terlaris, ringkasan piutang, ekspor CSV ke `laporan/` |
-| 5 | Pengaturan | Info aplikasi, info & ubah warung, cadangkan database (`cadangan/`), pulihkan dari cadangan |
+| No  | Menu                | Isi                                                                                           |
+| --- | ------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | Masuk ke Kasir      | Meja transaksi: cari barang, jumlah, diskon, tunai/bon, struk                                 |
+| 2   | Kelola Barang       | Daftar/cari/tambah/ubah/nonaktif/hapus barang, stok masuk, penyesuaian, riwayat, stok menipis |
+| 3   | Pelanggan & Piutang | Daftar/cari/tambah/ubah pelanggan, detail & riwayat, Buku Kas (bon), bayar cicilan            |
+| 4   | Laporan Penjualan   | Harian/mingguan/bulanan, barang terlaris, ringkasan piutang, ekspor CSV ke `laporan/`         |
+| 5   | Pengaturan          | Info aplikasi, info & ubah warung, cadangkan database (`cadangan/`), pulihkan dari cadangan   |
 
 Navigasi: ketik nomor lalu `Enter`; `Enter` kosong = konfirmasi/lanjut; `0` = kembali/keluar.
 
@@ -74,8 +76,8 @@ Daftar berkas uji: `uji_fondasi`, `uji_barang`, `uji_kasir`, `uji_stok`,
 
 ## Dokumentasi
 
-- `PRD.md` — kebutuhan produk, business rules, struktur database, roadmap (Fase 0–6).
-- `DESIGN.md` — pedoman UI/UX terminal (warna ANSI, gaya pseudo-3D, tata letak layar).
+- `docs/PRD.md` — kebutuhan produk, business rules, struktur database, roadmap (Fase 0–6).
+- `docs/DESAIN.md` — pedoman UI/UX terminal (warna ANSI, gaya pseudo-3D, tata letak layar).
 - `docs/POC-HASIL.md` — temuan runtime Indonesiaku Lang v1.4.0 yang mengikat.
 
 ## Status
