@@ -1,7 +1,7 @@
 # War-Rung
 
 Aplikasi kasir & pengelolaan warung berbasis terminal (CLI) untuk Windows — dibangun
-sepenuhnya dengan bahasa **Indonesiaku Lang** v1.4.0 dan database **SQLite** lokal.
+sepenuhnya dengan bahasa **[Indonesiaku Lang](https://github.com/teguh02/Indonesiaku-Lang)** v1.4.0 dan database **SQLite** lokal.
 
 ## Kebutuhan
 
